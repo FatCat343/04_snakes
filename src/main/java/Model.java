@@ -1,5 +1,7 @@
 import com.google.protobuf.Message;
 
+import java.net.DatagramSocket;
+import java.net.SocketException;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Model {
@@ -7,11 +9,17 @@ public class Model {
     public int oy;
     public int[] field;
     public int food;
+    public static DatagramSocket socket;
     public static ConcurrentHashMap<String, State> states = new ConcurrentHashMap<String, State>();
 
     public static void Init(){
-        parse("config.txt");
-        GUI.Init(); //set params in init
+        try {
+            socket = new DatagramSocket();
+            parse("config.txt");
+            GUI.Init(); //set params in init
+        } catch (SocketException e) {
+            e.printStackTrace();
+        }
     }
 
 

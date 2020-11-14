@@ -44,7 +44,7 @@ public class GUI {
 
     }
     public static void init() {
-        JFrame window = new JFrame("snake");
+        //JFrame window = new JFrame("snake");
         rightSide = new JPanel();
         rightSide.setLayout(new BorderLayout());
         tables= new JPanel();
