@@ -23,9 +23,10 @@ public class Model {
     }
 
 
+
+
     public static void StartNew(){
-        Snake MySnake = new Snake();
-        placeSnake(MySnake);
+
 
 
         GUI.repaint();
