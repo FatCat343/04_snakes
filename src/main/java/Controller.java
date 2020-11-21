@@ -1,9 +1,10 @@
 import me.ippolitov.fit.snakes.SnakesProto;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class Controller {
-
+    public static ConcurrentHashMap<Integer, SnakesProto.GamePlayer> players = new ConcurrentHashMap<>(); //list of clients
     //public static ConcurrentHashMap<String, State> states = new ConcurrentHashMap<String, State>();
     public static void main(String[] args) {
         parse("config.txt");

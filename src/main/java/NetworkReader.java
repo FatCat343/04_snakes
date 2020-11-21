@@ -1,9 +1,12 @@
 import me.ippolitov.fit.snakes.SnakesProto;
 
+import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 public class NetworkReader implements Runnable{
 //listens on all messages except multicast
-
-
+    public static ConcurrentHashMap<Sender, SnakesProto.GameMessage> received = new ConcurrentHashMap<>();
 
 
 
@@ -15,7 +18,15 @@ public class NetworkReader implements Runnable{
     @Override
     public void run() {
         while (true) {
-            SnakesProto.GameMessage gm = Network.receive();
+            Sender sender = new Sender();
+            SnakesProto.GameMessage gm = Network.receive(sender);
+            if (gm == null) continue;
+            System.out.println("sender ip = " + sender.ip);
+            //TODO: make iteration synchronised
+            //check whether we have msg of same type from same sender
+            received.entrySet().removeIf(pair -> ((pair.getKey().equals(sender)) && (pair.getValue().getTypeCase().equals(gm.getTypeCase()))));
+            //now we dont have msg of same type from same sender
+            received.put(sender, gm);
             switch (gm.getTypeCase()) {
                 case PING:{
                     Controller.pingAnswer(gm);

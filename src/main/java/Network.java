@@ -8,13 +8,15 @@ import java.net.DatagramPacket;
 import java.net.InetAddress;
 
 public class Network {
-    public static SnakesProto.GameMessage receive(){
+    public static SnakesProto.GameMessage receive(Sender sender){
         try {
             byte[] recvBuf = new byte[5000];
             DatagramPacket packet = new DatagramPacket(recvBuf, recvBuf.length);
             //System.out.println("port = " +Client.port);
 
             Model.socket.receive(packet);
+            sender.ip = packet.getAddress().toString();
+            sender.port = packet.getPort();
             //System.out.println("received");
             int byteCount = packet.getLength();
             ByteArrayInputStream byteStream = new ByteArrayInputStream(recvBuf);

@@ -39,4 +39,7 @@ public class Model {
     public static void placeSnake(Snake s){
 
     }
+    public static void exit() {
+
+    }
 }

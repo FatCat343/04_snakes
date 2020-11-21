@@ -2,10 +2,7 @@ import me.ippolitov.fit.snakes.SnakesProto;
 
 import java.time.LocalTime;
 import java.util.*;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 import static java.time.temporal.ChronoUnit.SECONDS;
 
@@ -17,20 +14,19 @@ public class NetworkWriter implements Runnable {
     //invokes by time -> removes list[0] -> send list[0] && invoke time = 0 -> ads list[0] to the end of list with new send time
     //invoketime = =0 -> invoketime = list[0].time + 3000ms
     //private static ConcurrentLinkedQueue<MStruct> queue;
-    public static PriorityQueue<Message> resend = new PriorityQueue<>();
-    public static ConcurrentHashMap<Integer, Integer> lastMessage = new ConcurrentHashMap<>();
+    public static LinkedBlockingDeque<Message> resend = new LinkedBlockingDeque<>();
+
     public static BlockingQueue<SnakesProto.GameMessage> queue = new LinkedBlockingQueue<>() ; //queue on output
-    public static ConcurrentHashMap<Integer, SnakesProto.GamePlayer> players = new ConcurrentHashMap<>(); //list of clients
+
     public LocalTime invoketime = null;
     public LocalTime checktime = null;
     public void run(){
         while (true) {
             SnakesProto.GameMessage message;
             try {
+                //TODO: change 3L to global timeout value
                 message = queue.poll(3L, TimeUnit.SECONDS);
-                //if (message == null) System.out.println("polled null message");
                 if (message != null) {
-                    //System.out.println("msg type = " +message.packet.type);
                     switch (message.getTypeCase()) {
                         case PING:{
                             send_single(message);
@@ -39,7 +35,7 @@ public class NetworkWriter implements Runnable {
                             send_single(message);
                         }
                         case ACK:{
-                            send_single(message);
+                            send_ack(message);
                         }
                         case STATE:{
                             send_all(message);
@@ -67,153 +63,117 @@ public class NetworkWriter implements Runnable {
                             }
                         }
                     }
-
                 }
             } catch (InterruptedException e) {
                 System.out.println("polling was interrupted");
                 e.printStackTrace();
             }
-
-            //if (invoketime == null) //System.out.println("null");
-            //else //System.out.println("seconds == "+SECONDS.between(LocalTime.now(), invoketime));
-
+            //TODO : change seconds.between() on correct func
             while ((invoketime != null) && (SECONDS.between(LocalTime.now(), invoketime) <= 0)) {
                 //resends oldest message
-                UUID id =resend.poll();
-                //System.out.println("resend old message, id = " + id + ", resend size = " + resend.size());
-                if (id != null){
-                    MStruct tmp = Client.list.get(id);
-                    //System.out.println("tbs = "+tmp.branches.size());
-                    if (SECONDS.between(LocalTime.now(), tmp.origtime.plusSeconds(30)) < 0) {
-                        deleteclients(tmp.branches);
-                        Client.list.remove(id);
+                Message msg = resend.poll(); //was id
+                if (msg != null){
+                    //TODO: change seconds.between + '30' to global var
+                    //timeout for message
+                    if (SECONDS.between(LocalTime.now(), msg.origtime.plusSeconds(30)) < 0) {
+                        deleteclients(msg.branches);
                         //copied from end of while not to miss this part
-                        UUID next = resend.peek();
+                        Message next = resend.peek();
                         if (next != null) {
-                            MStruct tmp1 = Client.list.get(next);
-                            invoketime = tmp1.sendtime.plusSeconds(3);
-                            //System.out.println(invoketime.getSecond() - tmp1.sendtime.getSecond());
+                            invoketime = next.sendtime.plusSeconds(3);
                         }
                         else invoketime = null;
                         continue;
                     }
-                    //System.out.println("tbs = "+tmp.branches.size());
-                    if (tmp.branches.size() > 0) {
-                        for (int i = 0; i < tmp.branches.size(); i++) {
-                            if (Client.clients.contains(tmp.branches.elementAt(i))) tmp.message.packet.send(tmp.branches.elementAt(i));
+                    if (msg.branches.size() > 0) {
+                        //TODO: check on importance of synchronization
+                        Iterator<Map.Entry<Integer, SnakesProto.GamePlayer>> it = msg.branches.entrySet().iterator();
+                        while (it.hasNext()) {
+                            Map.Entry<Integer, SnakesProto.GamePlayer> pair = it.next();
+                            if (Controller.players.contains(pair.getValue())) Network.send(msg.gm, Controller.players.get(msg.gm.getReceiverId()));
                         }
-                        tmp.sendtime = LocalTime.now();
-                        if (tmp.message.packet.type == MType.check) checktime = checktime.plusSeconds(3);
-                        //System.out.println("id was added back");
-                        resend.add(id); //add to tail
-                    }
-                    else {
-                        Client.list.remove(id);
-                        //System.out.println("removes from list id = " + id);
+                        msg.sendtime = LocalTime.now();
+                        resend.add(msg); //add to tail
                     }
                 }
-                UUID next = resend.peek();
+                Message next = resend.peek();
                 if (next != null) {
-                    MStruct tmp = Client.list.get(next);
-                    invoketime = tmp.sendtime.plusSeconds(3);
-                    //System.out.println(invoketime.getSecond() - tmp.sendtime.getSecond());
+                    invoketime = next.sendtime.plusSeconds(3);
                 }
                 else invoketime = null;
             }
-
-            //check secroot on availability by sending our secroot to him
-            //once in 30 sec sends test msg to secroot waiting for reply
-            //also removes all old messages from messagemap
-            if (Client.secroot != null) {
-                if (checktime == null) checktime = LocalTime.now();
-                if (SECONDS.between(LocalTime.now(), checktime.plusSeconds(30)) < 0) {
-                    Message tmp = new Message();
-                    msg tmpacket = new msg();
-                    tmpacket.id = UUID.randomUUID();
-                    tmpacket.text = Client.secroot.addr + " " + Client.secroot.port;
-                    tmpacket.type = MType.check;
-                    tmpacket.cl = new ClientData();
-                    tmpacket.cl = Client.secroot;
-                    tmp.type = MType.single;
-                    tmp.packet = tmpacket;
-                    Client.queue.add(tmp);
-                    checktime = LocalTime.now();
-                    //System.out.println("Checking secroot was added on sending with id = " + tmp.packet.id);
-                    //now remove messages
-                    Iterator<Map.Entry<UUID, LocalTime>> it = Client.messages.entrySet().iterator();
-                    while (it.hasNext()) {
-                        Map.Entry<UUID, LocalTime> pair = it.next();
-                        LocalTime lastseen = pair.getValue();
-                        //System.out.println("message with id = " + pair.getKey() + " was last seen at " + lastseen.toString());
-                        if (lastseen.plusSeconds(15).isBefore(LocalTime.now())) { //timeout
-                            it.remove();
-                        }
-                    }
-
-                }
-            }
-
         }
     }
     public static void Start(){
         Thread t = new Thread(new NetworkWriter());
         t.start();
     }
-    public void send_all(SnakesProto.GameMessage message){
+    private void send_all(SnakesProto.GameMessage message){
         Message mst = new Message();
         mst.gm = message;
-        //mst.branches = Client.clients;
-        mst.branches = new ConcurrentHashMap<>(players);
-        //mst.branches.setSize(players.size());
-        //Collections.copy(mst.branches, players);
-        //System.out.println("branches size = " + mst.branches.size());
-        //mst.branches.remove(mst.message.packet.cl); //remove host of message
+        //TODO : check if conroller.players changes between init of branches and iteration(client leaves or comes)
+        mst.branches = new ConcurrentHashMap<>(Controller.players);
         mst.origtime = LocalTime.now();
         mst.sendtime = mst.origtime;
-        ///////lastMessage.put(message.packet.id, mst); same:
-        //lastMessage.replaceAll( (k,v)->v=MY_VALUE );
-        //System.out.println("puts in list new mess with id = " + message.packet.id);
+        //all messages in resend of message.type need to be updated
+        //TODO: make iteration synchronized
+        Iterator<Message> iter = resend.iterator();
+        while (iter.hasNext()) {
+            if (iter.next().gm.getTypeCase() == message.getTypeCase()) resend.remove(iter.next());
+        }
+        boolean res = resend.add(mst);
+        if (invoketime == null) {
+            invoketime = mst.origtime.plusSeconds(3);
+        }
+        //TODO: make iteration synchronized
+        for (Map.Entry<Integer, SnakesProto.GamePlayer> pair : Controller.players.entrySet()) {
+            SnakesProto.GamePlayer player = pair.getValue();
+            Network.send(message, player);
+        }
+    }
+    private void send_single(SnakesProto.GameMessage message){
+        Message mst = new Message();
+        mst.gm = message;
+        mst.branches = new ConcurrentHashMap<>();
+        mst.branches.put(message.getReceiverId(), Controller.players.get(message.getReceiverId()));
+        mst.origtime = LocalTime.now();
+        mst.sendtime = mst.origtime;
+        Network.send(message, Controller.players.get(message.getReceiverId()));
+        //check if we have older message of same type to same receiver
+        //TODO: make iteration synchronized
+        Iterator<Message> iter = resend.iterator();
+        while (iter.hasNext()) {
+            if ((iter.next().gm.getReceiverId() == message.getReceiverId()) && (iter.next().gm.getTypeCase() == message.getTypeCase())) resend.remove(iter.next());
+        }
         boolean res = resend.add(mst);
         //System.out.println("result of offering = " + res + " tryed to offer " + message.packet.id.toString());
         if (invoketime == null) {
-            //System.out.println("adding 3 sec");
             invoketime = mst.origtime.plusSeconds(3);
-            //System.out.println(invoketime.getSecond() - mst.origtime.getSecond());
         }
-        for (int i = 0; i < Client.clients.size(); i++) { //iterate through hashmap
-            if (!message.packet.cl.equals(Client.clients.elementAt(i))) {
-                //System.out.println("NOT EQUALS at i = "+ i);
-                Network.send(message, Client.clients.elementAt(i));
+    }
+    private static void send_ack(SnakesProto.GameMessage gm){
+        //same as send_single, but don't add to resend
+        //TODO: make iteration synchronized
+        Iterator<Map.Entry<Sender, SnakesProto.GameMessage>> it = NetworkReader.received.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<Sender, SnakesProto.GameMessage> pair = it.next();
+            //checks if in pair sender = receiver in gm and if msg_id's are equal
+            if ((gm.getMsgSeq() == pair.getValue().getMsgSeq()) && (Controller.players.get(gm.getReceiverId()).getIpAddress().equals(pair.getKey().ip)) && (Controller.players.get(gm.getReceiverId()).getPort() == pair.getKey().port)) { //timeout
+                Network.send(gm, Controller.players.get(gm.getReceiverId()));
             }
-            //else System.out.println("EQUALS at i = "+ i);
         }
-    }
-    public void send_single(SnakesProto.GameMessage message){
-        Message mst = new Message();
-        mst.gm = message;
-        //mst.branches = Client.clients;
-        mst.branches = new Vector<>();
-        //Collections.copy(mst.branches, Client.clients);
-        boolean res1 = mst.branches.add(players.get(message.getReceiverId()));
-        //System.out.println("sending check msg to "+message.packet.cl.port+ " status - " + res1);
-        //System.out.println("branches size = " + mst.branches.size());
-        mst.origtime = LocalTime.now();
-        mst.sendtime = mst.origtime;
-        Client.list.put(message.packet.id, mst);
-        Network.send(message, players.get(message.getReceiverId()));
-        boolean res = resend.add(message.packet.id);
-        //System.out.println("result of offering = " + res + " tryed to offer " + message.packet.id.toString());
-        if (invoketime == null) {
-            //System.out.println("adding 3 sec");
-            invoketime = mst.origtime.plusSeconds(3);
-            //System.out.println(invoketime.getSecond() - mst.origtime.getSecond());
-        }
-    }
 
-    public void deleteclients(Vector<ClientData> clients){
+    }
+    public void deleteclients(ConcurrentHashMap<Integer, SnakesProto.GamePlayer> clients){
         //System.out.println("delete clients called");
-        for (int i = 0; i < clients.size(); i++){
-            Client.clients.remove(clients.elementAt(i));
+        //TODO: check on importance of synchronization
+        Iterator<Map.Entry<Integer, SnakesProto.GamePlayer>> it = clients.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<Integer, SnakesProto.GamePlayer> pair = it.next();
+            //if (Controller.players.contains(pair.getValue())) Network.send(msg.gm, Controller.players.get(msg.gm.getReceiverId()));
+        //}
+        //for (int i = 0; i < clients.size(); i++){
+            Controller.players.remove(pair.getKey(), pair.getValue());
             if (clients.elementAt(i).equals(Client.secroot)) {
                 //System.out.println("Secroot in unreacheble, self = " + Client.self.addr + Client.self.port + ", thirdroot = " + Client.thirdroot.addr + Client.thirdroot.port);
                 if (!Client.thirdroot.equals(Client.self)) {
