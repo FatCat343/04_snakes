@@ -1,3 +1,5 @@
+import me.ippolitov.fit.snakes.SnakesProto;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -243,28 +245,28 @@ public class GUI {
                 new AbstractAction() {
                     @Override
                     public void actionPerformed(ActionEvent e) {
-                        Controller.steer("up");
+                        Controller.steer(SnakesProto.Direction.UP);
                     }
                 });
         game.getActionMap().put("down arrow",
                 new AbstractAction() {
                     @Override
                     public void actionPerformed(ActionEvent e) {
-                        Controller.steer("down");
+                        Controller.steer(SnakesProto.Direction.DOWN);
                     }
                 });
         game.getActionMap().put("left arrow",
                 new AbstractAction() {
                     @Override
                     public void actionPerformed(ActionEvent e) {
-                        Controller.steer("left");
+                        Controller.steer(SnakesProto.Direction.LEFT);
                     }
                 });
         game.getActionMap().put("right arrow",
                 new AbstractAction() {
                     @Override
                     public void actionPerformed(ActionEvent e) {
-                        Controller.steer("right");
+                        Controller.steer(SnakesProto.Direction.RIGHT);
                     }
                 });
     }

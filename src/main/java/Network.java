@@ -6,6 +6,9 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
+import java.time.LocalTime;
+import java.util.Iterator;
+import java.util.Map;
 
 public class Network {
     public static SnakesProto.GameMessage receive(Sender sender){
@@ -39,6 +42,8 @@ public class Network {
             DatagramPacket packet = new DatagramPacket(sendBuf, sendBuf.length, InetAddress.getByName(receiver.getIpAddress()), receiver.getPort());
             //System.out.println("sends " + type + " with id = " + id + " to addr = " + cld.addr + " to port = " + cld.port);
             Model.socket.send(packet);
+            //TODO: make sync iter
+            NetworkWriter.lastSent.put(receiver, LocalTime.now());
         }
         catch (IOException e) {
             e.printStackTrace();

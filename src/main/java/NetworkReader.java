@@ -32,7 +32,7 @@ public class NetworkReader implements Runnable{
                     Controller.pingAnswer(gm);
                 }
                 case STEER:{
-                    Controller.steer(gm);
+                    Controller.steer(gm, sender);
                 }
                 case ACK:{
                     Controller.ack(gm);
