@@ -1,16 +1,21 @@
 import me.ippolitov.fit.snakes.SnakesProto;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class Controller {
-    public static ConcurrentHashMap<Integer, SnakesProto.GamePlayer> players = new ConcurrentHashMap<>(); //list of ALL clients
+    public static List<SnakesProto.GamePlayer> players = new ArrayList<>(); //list of ALL clients
     public static int playerId = 0;
     public static int masterId = 1;
     public static SnakesProto.NodeRole role = null;
+    //TODO: some fields are in game config
     public static int ping_delay_ms = 100;
     public static int node_timeout_ms = 800;
+    public static SnakesProto.GameConfig config;
     //public static ConcurrentHashMap<String, State> states = new ConcurrentHashMap<String, State>();
     public static void main(String[] args) {
         parse("config.txt");
@@ -20,11 +25,14 @@ public class Controller {
         NetworkReader.start();
         GameListSender.start();
     }
-    public static void setState(SnakesProto.GameMessage gm){
+    public static void setState(SnakesProto.GameMessage gm, Sender sender){
         //changes state of ours snake
+        config = gm.getState().getState().getConfig();
+        //TODO: make change synchronized
+        players = gm.getState().getState().getPlayers().getPlayersList();
+        Model.setState(gm.getState().getState());
+        Model.sendAck(gm, getId(sender));
     }
-
-
 
     public static void parse(String filename){ //parse config file to get params
 
@@ -48,19 +56,20 @@ public class Controller {
         }
     }
     public static void error(SnakesProto.GameMessage gm){
-
+        Model.error(gm);
     }
-    public static void ack(SnakesProto.GameMessage gm){
-
+    public static void ack(SnakesProto.GameMessage gm, Sender sender){
+        Model.getAck(gm, getPlayer(sender));
     }
-    public static void join(SnakesProto.GameMessage gm){
-
+    public static void join(SnakesProto.GameMessage gm, Sender sender){
+        Model.join(sender);
+        Model.sendAck(gm, getId(sender));
     }
     public static void roleChange(SnakesProto.GameMessage gm){
 
     }
-    public static void pingAnswer(SnakesProto.GameMessage gm){
-
+    public static void pingAnswer(SnakesProto.GameMessage gm, Sender sender){
+        Model.sendAck(gm, getId(sender));
     }
     public static void exit() {
         Model.exit();
@@ -70,19 +79,43 @@ public class Controller {
     }
     public static SnakesProto.NodeRole getRole(int searchId){
         //TODO: sync iteration
-        for (Map.Entry<Integer, SnakesProto.GamePlayer> pair : Controller.players.entrySet()) {
-            SnakesProto.GamePlayer player = pair.getValue();
-            if (player.getId() == searchId) return player.getRole();
+        Iterator<SnakesProto.GamePlayer> iter = players.iterator();
+        while (iter.hasNext()) {
+            if (iter.next().getId() == searchId) {
+                return iter.next().getRole();
+            }
         }
         return null;
     }
     public static int getId(Sender sender){
         //TODO: sync iteration
-        for (Map.Entry<Integer, SnakesProto.GamePlayer> pair : Controller.players.entrySet()) {
-            SnakesProto.GamePlayer player = pair.getValue();
-            if ((player.getIpAddress().equals(sender.ip)) && (player.getPort() == sender.port)) return pair.getKey();
+        Iterator<SnakesProto.GamePlayer> iter = players.iterator();
+        while (iter.hasNext()) {
+            if ((iter.next().getIpAddress().equals(sender.ip)) && (iter.next().getPort() == sender.port)) {
+                return iter.next().getId();
+            }
         }
         return -1;
+    }
+    public static SnakesProto.GamePlayer getPlayer(Sender sender){
+        //TODO: make synchronized iteration
+        Iterator<SnakesProto.GamePlayer> iter = players.iterator();
+        while (iter.hasNext()) {
+            if ((iter.next().getIpAddress().equals(sender.ip)) && (iter.next().getPort() == sender.port)) {
+                return iter.next();
+            }
+        }
+        return null;
+    }
+    public static SnakesProto.GamePlayer getPlayer(int searchId){
+        //TODO: make synchronized iteration
+        Iterator<SnakesProto.GamePlayer> iter = players.iterator();
+        while (iter.hasNext()) {
+            if (iter.next().getId() == searchId) {
+                return iter.next();
+            }
+        }
+        return null;
     }
     public static void changeMaster(){
         //find deputy, change info about master to deputy

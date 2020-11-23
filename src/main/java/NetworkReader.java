@@ -22,29 +22,40 @@ public class NetworkReader implements Runnable{
             SnakesProto.GameMessage gm = Network.receive(sender);
             if (gm == null) continue;
             System.out.println("sender ip = " + sender.ip);
+            int alreadyReceived = 0;
             //TODO: make iteration synchronised
+            for (Map.Entry<Sender, SnakesProto.GameMessage> pair : received.entrySet()) {
+                SnakesProto.GameMessage message = pair.getValue();
+                Sender sender1 = pair.getKey();
+                if ((message.getMsgSeq() == gm.getMsgSeq()) && (sender1.equals(sender))) {
+                    alreadyReceived = 1;
+                    break;
+                }
+            }
+            if (alreadyReceived == 1) continue;
             //check whether we have msg of same type from same sender
+            //TODO: make iteration synchronised
             received.entrySet().removeIf(pair -> ((pair.getKey().equals(sender)) && (pair.getValue().getTypeCase().equals(gm.getTypeCase()))));
             //now we dont have msg of same type from same sender
             received.put(sender, gm);
             switch (gm.getTypeCase()) {
                 case PING:{
-                    Controller.pingAnswer(gm);
+                    Controller.pingAnswer(gm, sender);
                 }
                 case STEER:{
                     Controller.steer(gm, sender);
                 }
                 case ACK:{
-                    Controller.ack(gm);
+                    Controller.ack(gm, sender);
                 }
                 case STATE:{
-                    Controller.setState(gm);
+                    Controller.setState(gm, sender);
                 }
                 case ANNOUNCEMENT:{
                    System.out.println("ERROR, multicast received by wrong socket");
                 }
                 case JOIN:{
-                    Controller.join(gm);
+                    Controller.join(gm, sender);
                 }
                 case ERROR:{
                     Controller.error(gm);

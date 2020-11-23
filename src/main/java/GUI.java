@@ -75,7 +75,7 @@ public class GUI {
         CreateSpecs();
         CreateButtons();
     }
-    public static void repaint(){
+    public static void repaint(SnakesProto.GameState state){
         RepaintField();
         RepaintGameList();
         RepaintScores();
@@ -83,7 +83,9 @@ public class GUI {
         RepaintButtons();
         //show result of addings
     }
+    public static void error(String message){
 
+    }
     private static void CreateField() { //adds field to window
         gameField = new JPanel();
         gameField.setLayout(new GridLayout(oy, ox));

@@ -3,6 +3,7 @@ import me.ippolitov.fit.snakes.SnakesProto;
 
 import java.net.DatagramSocket;
 import java.net.SocketException;
+import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Model {
@@ -11,8 +12,8 @@ public class Model {
     public int[] field;
     public int food;
     public static DatagramSocket socket;
-    public static ConcurrentHashMap<String, State> states = new ConcurrentHashMap<String, State>();
-
+    //public static ConcurrentHashMap<String, State> states = new ConcurrentHashMap<String, State>();
+    public static SnakesProto.GameState state;
     public static void Init(){
         try {
             socket = new DatagramSocket();
@@ -30,7 +31,7 @@ public class Model {
 
 
 
-        GUI.repaint();
+        GUI.repaint(state);
     }
 
 
@@ -47,6 +48,18 @@ public class Model {
         int id = 0;
 
         return id;
+    }
+    public static void join(Sender sender){
+        GameProcess.newPlayer(sender);
+
+    }
+    public static void error(SnakesProto.GameMessage gm){
+        GUI.error(gm.getError().getErrorMessage());
+    }
+    public static void setState(SnakesProto.GameState state1){
+        state = state1;
+        //update controller.players
+        GUI.repaint(state);
     }
     public static void sendSteer(SnakesProto.Direction dir){
         SnakesProto.GameMessage.Builder gm = SnakesProto.GameMessage.newBuilder();
@@ -68,5 +81,15 @@ public class Model {
         gm.setReceiverId(receiverId);
         gm.setMsgSeq(message.getMsgSeq());
         NetworkWriter.queue.add(gm.build());
+    }
+    public static void getAck(SnakesProto.GameMessage gm, SnakesProto.GamePlayer player){
+        //TODO: make iteration synchronized
+        Iterator<MessageCustom> iter = NetworkWriter.resend.iterator();
+        while (iter.hasNext()) {
+            if (iter.next().gm.getMsgSeq() == gm.getMsgSeq()) {
+                //delete sender id from branches
+                iter.next().branches.remove(player);
+            }
+        }
     }
 }

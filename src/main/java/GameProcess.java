@@ -27,5 +27,8 @@ public class GameProcess implements Runnable {
     public static void setSteer(SnakesProto.Direction dir, int id){
         steers.put(id, dir);
     }
+    public static void newPlayer(Sender sender){
+
+    }
 
 }
