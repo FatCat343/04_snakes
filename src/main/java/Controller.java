@@ -65,7 +65,43 @@ public class Controller {
         Model.join(sender);
         Model.sendAck(gm, getId(sender));
     }
-    public static void roleChange(SnakesProto.GameMessage gm){
+    public static void roleChange(SnakesProto.GameMessage gm, Sender sender){
+        if (gm.getRoleChange().hasSenderRole()){
+            if (gm.getRoleChange().getSenderRole().equals(SnakesProto.NodeRole.VIEWER)){
+                if (gm.getRoleChange().hasReceiverRole()){
+                    if (gm.getRoleChange().getReceiverRole().equals(SnakesProto.NodeRole.MASTER)){
+                        becomeMaster();
+                    }
+                }
+                else {
+                    Model.deletePlayer(gm.getSenderId());
+                }
+            }
+            if (gm.getRoleChange().getSenderRole().equals(SnakesProto.NodeRole.MASTER)){
+                if (gm.getRoleChange().hasReceiverRole()){
+                    if (gm.getRoleChange().getReceiverRole().equals(SnakesProto.NodeRole.DEPUTY)){
+                        findDeputy();
+                    }
+                    if (gm.getRoleChange().getReceiverRole().equals(SnakesProto.NodeRole.VIEWER)){
+                        Model.dead();
+                    }
+                }
+                else {
+                    masterId = gm.getSenderId();
+                }
+            }
+        }
+        else {
+            if (gm.getRoleChange().hasReceiverRole()){
+                if (gm.getRoleChange().getReceiverRole().equals(SnakesProto.NodeRole.DEPUTY)){
+                    //become deputy
+                }
+                if (gm.getRoleChange().getReceiverRole().equals(SnakesProto.NodeRole.VIEWER)){
+                    Model.dead();
+                }
+            }
+
+        }
 
     }
     public static void pingAnswer(SnakesProto.GameMessage gm, Sender sender){
@@ -119,9 +155,22 @@ public class Controller {
     }
     public static void changeMaster(){
         //find deputy, change info about master to deputy
+        Iterator<SnakesProto.GamePlayer> iter = players.iterator();
+        while (iter.hasNext()) {
+            if (iter.next().getRole().equals(SnakesProto.NodeRole.DEPUTY)) {
+                masterId = iter.next().getId();
+            }
+        }
     }
     public static void findDeputy(){
         //find new deputy in players map
+        Iterator<SnakesProto.GamePlayer> iter = players.iterator();
+        while (iter.hasNext()) {
+            if (iter.next().getRole().equals(SnakesProto.NodeRole.NORMAL)) {
+                Model.setDeputy(iter.next().getId());
+                break;
+            }
+        }
     }
     public static void becomeMaster(){
         //взять управление игрой

@@ -69,6 +69,7 @@ public class NetworkWriter implements Runnable {
             //TODO : changed seconds.between() on correct func ->isBefore, check
             while ((invoketime != null) && invoketime.isBefore(LocalTime.now())) {
                 //resends oldest message
+                //TODO: change resend to send old msg to new MASTER
                 MessageCustom msg = resend.poll(); //was id
                 if (msg != null){
                     //TODO: change seconds.between - check
@@ -88,7 +89,12 @@ public class NetworkWriter implements Runnable {
                         Iterator<SnakesProto.GamePlayer> iter = msg.branches.iterator();
                         while (iter.hasNext()) {
                             if (Controller.players.contains(iter.next())) {
-                                Network.send(msg.gm, iter.next());
+                                //if needed to be sent to MASTER, finds new MASTER
+                                if (iter.next().getRole().equals(SnakesProto.NodeRole.MASTER)){
+                                    SnakesProto.GamePlayer master = Controller.getPlayer(Controller.masterId);
+                                    if (master != null) Network.send(msg.gm, master);
+                                }
+                                else Network.send(msg.gm, iter.next());
                             }
                             else iter.remove();
                         }
@@ -201,9 +207,11 @@ public class NetworkWriter implements Runnable {
     public void deleteclients(List<SnakesProto.GamePlayer> clients){
         //System.out.println("delete clients called");
         //TODO: check on importance of synchronization
-        Iterator<SnakesProto.GamePlayer> it = Controller.players.iterator();
+        Iterator<SnakesProto.GamePlayer> it = clients.iterator();
         while (it.hasNext()) {
-            SnakesProto.GamePlayer player = it.next();
+            //works with up-to-date player
+            SnakesProto.GamePlayer player = Controller.getPlayer(it.next().getId());
+            if (player == null) continue;
             Controller.players.remove(player);
             //we are normal, delete master
             if ((player.getRole().equals(SnakesProto.NodeRole.MASTER)) && (Objects.equals(Controller.getRole(Controller.playerId), SnakesProto.NodeRole.NORMAL))){

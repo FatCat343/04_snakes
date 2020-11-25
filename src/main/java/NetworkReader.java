@@ -61,7 +61,7 @@ public class NetworkReader implements Runnable{
                     Controller.error(gm);
                 }
                 case ROLE_CHANGE:{
-                    Controller.roleChange(gm);
+                    Controller.roleChange(gm, sender);
                 }
             }
         }

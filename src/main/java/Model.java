@@ -61,6 +61,9 @@ public class Model {
         //update controller.players
         GUI.repaint(state);
     }
+    public static void setDeputy(int deputyId){
+
+    }
     public static void sendSteer(SnakesProto.Direction dir){
         SnakesProto.GameMessage.Builder gm = SnakesProto.GameMessage.newBuilder();
         SnakesProto.GameMessage.SteerMsg.Builder steer = SnakesProto.GameMessage.SteerMsg.newBuilder();
@@ -91,5 +94,11 @@ public class Model {
                 iter.next().branches.remove(player);
             }
         }
+    }
+    public static void deletePlayer(int id){
+
+    }
+    public static void dead(){
+
     }
 }
