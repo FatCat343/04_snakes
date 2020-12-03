@@ -15,7 +15,7 @@ public class Controller {
     //TODO: some fields are in game config
     public static int ping_delay_ms = 100;
     public static int node_timeout_ms = 800;
-    public static SnakesProto.GameConfig config;
+    //public static SnakesProto.GameConfig config;
     //public static ConcurrentHashMap<String, State> states = new ConcurrentHashMap<String, State>();
     public static void main(String[] args) {
         parse("config.txt");
@@ -27,7 +27,7 @@ public class Controller {
     }
     public static void setState(SnakesProto.GameMessage gm, Sender sender){
         //changes state of ours snake
-        config = gm.getState().getState().getConfig();
+        Model.config = gm.getState().getState().getConfig();
         //TODO: make change synchronized
         players = gm.getState().getState().getPlayers().getPlayersList();
         Model.setState(gm.getState().getState());
@@ -62,7 +62,7 @@ public class Controller {
         Model.getAck(gm, getPlayer(sender));
     }
     public static void join(SnakesProto.GameMessage gm, Sender sender){
-        Model.join(sender);
+        Model.join(gm, sender);
         Model.sendAck(gm, getId(sender));
     }
     public static void roleChange(SnakesProto.GameMessage gm, Sender sender){

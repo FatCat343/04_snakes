@@ -1,3 +1,4 @@
+import com.google.protobuf.AbstractMessage;
 import com.google.protobuf.Message;
 import me.ippolitov.fit.snakes.SnakesProto;
 
@@ -14,6 +15,7 @@ public class Model {
     public static DatagramSocket socket;
     //public static ConcurrentHashMap<String, State> states = new ConcurrentHashMap<String, State>();
     public static SnakesProto.GameState state;
+    public static SnakesProto.GameConfig config;
     public static void Init(){
         try {
             socket = new DatagramSocket();
@@ -38,7 +40,7 @@ public class Model {
     public static void parse(String filename){ //parse config file to get params
 
     }
-    public static void placeSnake(Snake s){
+    public static void placeSnake(SnakesProto.GameState.Snake s){
 
     }
     public static void exit() {
@@ -49,8 +51,8 @@ public class Model {
 
         return id;
     }
-    public static void join(Sender sender){
-        GameProcess.newPlayer(sender);
+    public static void join(SnakesProto.GameMessage gm, Sender sender){
+        GameProcess.newPlayer(gm, sender);
 
     }
     public static void error(SnakesProto.GameMessage gm){
@@ -63,6 +65,22 @@ public class Model {
     }
     public static void setDeputy(int deputyId){
 
+    }
+    public static void sendError(SnakesProto.GameMessage gm, Sender sender, String erMsg){
+        SnakesProto.GameMessage.Builder message = SnakesProto.GameMessage.newBuilder();
+        SnakesProto.GameMessage.ErrorMsg.Builder error = SnakesProto.GameMessage.ErrorMsg.newBuilder();
+        error.setErrorMessage(erMsg);
+        message.setError(error);
+        message.setMsgSeq(getMsgId());
+
+        SnakesProto.GamePlayer.Builder p = SnakesProto.GamePlayer.newBuilder();
+        p.setId(0);
+        p.setName("");
+        p.setIpAddress(sender.ip);
+        p.setPort(sender.port);
+        p.setRole(SnakesProto.NodeRole.NORMAL);
+        p.setScore(0);
+        NetworkWriter.sendError(message.build(), p.build());
     }
     public static void sendSteer(SnakesProto.Direction dir){
         SnakesProto.GameMessage.Builder gm = SnakesProto.GameMessage.newBuilder();

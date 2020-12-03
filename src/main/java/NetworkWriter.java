@@ -17,7 +17,7 @@ public class NetworkWriter implements Runnable {
     public static LinkedBlockingDeque<MessageCustom> resend = new LinkedBlockingDeque<>();
     public static BlockingQueue<SnakesProto.GameMessage> queue = new LinkedBlockingQueue<>() ; //queue on output
     public static ConcurrentHashMap<SnakesProto.GamePlayer, LocalTime> lastSent = new ConcurrentHashMap<>();
-    public LocalTime invoketime = null;
+    public static LocalTime invoketime = null;
     public LocalTime checktime = null;
     public void run(){
         while (true) {
@@ -46,6 +46,7 @@ public class NetworkWriter implements Runnable {
                         }
                         case ERROR:{
                             send_single(message);
+                            //wont be in queue
                         }
                         case ROLE_CHANGE:{ //always have sender_id and receiver_id
                             if (message.getRoleChange().hasSenderRole() && message.getRoleChange().getSenderRole() == SnakesProto.NodeRole.MASTER) {
@@ -73,13 +74,14 @@ public class NetworkWriter implements Runnable {
                 MessageCustom msg = resend.poll(); //was id
                 if (msg != null){
                     //TODO: change seconds.between - check
+                    //TODO: add special rules to resend error messages (shouldn't compare receiver to players)
                     //timeout for message
-                    if (msg.origtime.plusNanos(Controller.config.getNodeTimeoutMs() * 1000000).isBefore(LocalTime.now())) {
+                    if (msg.origtime.plusNanos(Model.config.getNodeTimeoutMs() * 1000000).isBefore(LocalTime.now())) {
                         deleteclients(msg.branches);
                         //copied from end of while not to miss this part
                         MessageCustom next = resend.peek();
                         if (next != null) {
-                            invoketime = next.sendtime.plusNanos(Controller.config.getPingDelayMs() * 1000000);
+                            invoketime = next.sendtime.plusNanos(Model.config.getPingDelayMs() * 1000000);
                         }
                         else invoketime = null;
                         continue;
@@ -104,7 +106,7 @@ public class NetworkWriter implements Runnable {
                 }
                 MessageCustom next = resend.peek();
                 if (next != null) {
-                    invoketime = next.sendtime.plusNanos(Controller.config.getPingDelayMs() * 1000000);
+                    invoketime = next.sendtime.plusNanos(Model.config.getPingDelayMs() * 1000000);
                 }
                 else invoketime = null;
             }
@@ -117,7 +119,7 @@ public class NetworkWriter implements Runnable {
                     it.remove();
                     continue;
                 }
-                if (pair.getValue().plusNanos(Controller.config.getPingDelayMs() * 1000000).isBefore(LocalTime.now())){
+                if (pair.getValue().plusNanos(Model.config.getPingDelayMs() * 1000000).isBefore(LocalTime.now())){
                     send_ping(pair.getKey());
                 }
             }
@@ -130,6 +132,30 @@ public class NetworkWriter implements Runnable {
         gm.setReceiverId(player.getId());
         gm.setMsgSeq(Model.getMsgId());
         send_single(gm.build());
+    }
+    public static void sendError(SnakesProto.GameMessage message, SnakesProto.GamePlayer receiver){
+        //TODO: ?????????
+        MessageCustom mst = new MessageCustom();
+        mst.gm = message;
+        mst.branches = new ArrayList<>();
+        mst.branches.add(receiver);
+        mst.origtime = LocalTime.now();
+        mst.sendtime = mst.origtime;
+        Network.send(message, receiver);
+        //check if we have older message of same type to same receiver
+        //TODO: make iteration synchronized - do we need it here?
+        Iterator<MessageCustom> iter = resend.iterator();
+        while (iter.hasNext()) {
+            if ((iter.next().gm.getReceiverId() == message.getReceiverId()) && (iter.next().gm.getTypeCase() == message.getTypeCase())) {
+                resend.remove(iter.next());
+                break;
+            }
+        }
+        boolean res = resend.add(mst);
+        //System.out.println("result of offering = " + res + " tryed to offer " + message.packet.id.toString());
+        if (invoketime == null) {
+            invoketime = mst.origtime.plusNanos(Model.config.getPingDelayMs() * 1000000);
+        }
     }
     public static void Start(){
         Thread t = new Thread(new NetworkWriter());
@@ -154,7 +180,7 @@ public class NetworkWriter implements Runnable {
         }
         boolean res = resend.add(mst);
         if (invoketime == null) {
-            invoketime = mst.origtime.plusNanos(Controller.config.getPingDelayMs() * 1000000);
+            invoketime = mst.origtime.plusNanos(Model.config.getPingDelayMs() * 1000000);
         }
         //TODO: make iteration synchronized
         for (SnakesProto.GamePlayer gamePlayer : Controller.players) {
@@ -183,7 +209,7 @@ public class NetworkWriter implements Runnable {
         boolean res = resend.add(mst);
         //System.out.println("result of offering = " + res + " tryed to offer " + message.packet.id.toString());
         if (invoketime == null) {
-            invoketime = mst.origtime.plusNanos(Controller.config.getPingDelayMs() * 1000000);
+            invoketime = mst.origtime.plusNanos(Model.config.getPingDelayMs() * 1000000);
         }
     }
     private static void send_ack(SnakesProto.GameMessage gm){
