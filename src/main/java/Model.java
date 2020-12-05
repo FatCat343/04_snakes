@@ -92,6 +92,17 @@ public class Model {
         NetworkWriter.queue.add(gm.build());
         System.out.println(dir);
     }
+    public static void sendState(SnakesProto.GameState state){
+        SnakesProto.GameMessage.Builder gm = SnakesProto.GameMessage.newBuilder();
+        SnakesProto.GameMessage.StateMsg.Builder gm1 = SnakesProto.GameMessage.StateMsg.newBuilder();
+        gm1.setState(state);
+        gm.setState(gm1.build());
+        gm.setMsgSeq(getMsgId());
+        NetworkWriter.queue.add(gm.build());
+    }
+    public static void showState(SnakesProto.GameState state){
+        GUI.repaint(state);
+    }
     public static void steer(SnakesProto.Direction dir, int playerId){
         GameProcess.setSteer(dir, playerId);
     }
@@ -114,7 +125,8 @@ public class Model {
         }
     }
     public static void deletePlayer(int id){
-
+        //TODO: sync
+        GameProcess.aliveSnakes--;
     }
     public static void dead(){
 
