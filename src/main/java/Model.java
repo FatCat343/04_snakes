@@ -16,11 +16,12 @@ public class Model {
     //public static ConcurrentHashMap<String, State> states = new ConcurrentHashMap<String, State>();
     public static SnakesProto.GameState state;
     public static SnakesProto.GameConfig config;
+    public static int msgNum = 0;
     public static void Init(){
         try {
             socket = new DatagramSocket();
             parse("config.txt");
-            GUI.Init(); //set params in init
+            GUI.init(); //set params in init
         } catch (SocketException e) {
             e.printStackTrace();
         }
@@ -30,7 +31,8 @@ public class Model {
 
 
     public static void StartNew(){
-
+        GameProcess.start();
+        //GameProcess.newPlayer(null, null);
 
 
         GUI.repaint(state);
@@ -40,16 +42,15 @@ public class Model {
     public static void parse(String filename){ //parse config file to get params
 
     }
-    public static void placeSnake(SnakesProto.GameState.Snake s){
-
-    }
+//    public static void placeSnake(SnakesProto.GameState.Snake s){
+//
+//    }
     public static void exit() {
-
+        //send changeState to viewer
     }
     public static int getMsgId(){
-        int id = 0;
-
-        return id;
+        msgNum++;
+        return msgNum;
     }
     public static void join(SnakesProto.GameMessage gm, Sender sender){
         GameProcess.newPlayer(gm, sender);
@@ -59,12 +60,13 @@ public class Model {
         GUI.error(gm.getError().getErrorMessage());
     }
     public static void setState(SnakesProto.GameState state1){
+        //TODO : sync
         state = state1;
         //update controller.players
         GUI.repaint(state);
     }
     public static void setDeputy(int deputyId){
-
+        //?
     }
     public static void sendError(SnakesProto.GameMessage gm, Sender sender, String erMsg){
         SnakesProto.GameMessage.Builder message = SnakesProto.GameMessage.newBuilder();
@@ -124,11 +126,25 @@ public class Model {
             }
         }
     }
-    public static void deletePlayer(int id){
+    public static void becomeViewer(int id){
         //TODO: sync
-        GameProcess.aliveSnakes--;
-    }
-    public static void dead(){
+        //player asked to be viewer
+        if (id != Controller.playerId){
+            //another player become Viewer -> change his role (mb set snake to !ALIVE)
 
+        }
+        else {
+            //we become viewer ??
+            Controller.role = SnakesProto.NodeRole.VIEWER;
+        }
+        GameProcess.aliveSnakes--;
+
+    }
+//    public static void dead(){
+//
+//    }
+    public static void disconnect(int id){
+        //find snake, set to !ALIVE
+        //delete from players
     }
 }

@@ -7,12 +7,13 @@ import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static java.time.temporal.ChronoUnit.SECONDS;
 
 public class GameListReceiver implements Runnable {
     MulticastSocket socket;
-    HashMap<String, LocalTime> table = new HashMap<>();
+    ConcurrentHashMap<String, LocalTime> table = new ConcurrentHashMap<>();
     public static void StartClient(MulticastSocket socket){
         Thread t = new Thread(new GameListReceiver(socket));
         t.start();
@@ -20,16 +21,17 @@ public class GameListReceiver implements Runnable {
     GameListReceiver(MulticastSocket s){
         socket = s;
     }
-    public void UpdateTable(String msg){ //timeout = n seconds
+    public void UpdateTable(String msg){
         if (table.containsKey(msg)) table.replace(msg, LocalTime.now());
         else table.put(msg, LocalTime.now());
-        Iterator it = table.entrySet().iterator();
+        Iterator<Map.Entry<String, LocalTime>> it = table.entrySet().iterator();
         while(it.hasNext()){
-            System.out.println("1");
-            Map.Entry pair = (Map.Entry)it.next();
-            System.out.println(pair.getKey());
-            if (SECONDS.between((LocalTime)pair.getValue(), LocalTime.now()) >= 30) { //timeout
-                System.out.println(pair.getKey() + "  " + pair.getValue() + "   " + LocalTime.now());
+            //System.out.println("1");
+            Map.Entry<String, LocalTime> pair = it.next();
+            //System.out.println(pair.getKey());
+            //TODO: change second.between
+            if (pair.getValue().plusNanos(Model.config.getNodeTimeoutMs() * 1000000).isBefore(LocalTime.now())) { //timeout
+                //System.out.println(pair.getKey() + "  " + pair.getValue() + "   " + LocalTime.now());
                 it.remove();
             }
         }
@@ -47,6 +49,7 @@ public class GameListReceiver implements Runnable {
             System.out.println("[Multicast UDP message received] >> " + msg);
             UpdateTable(packet.getSocketAddress().toString().split(":")[0]);
             System.out.println("copies launched : " + table.size());
+            GUI.repaintGameList(table);
         }
     }
 

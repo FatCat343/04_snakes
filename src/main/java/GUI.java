@@ -1,12 +1,18 @@
 import me.ippolitov.fit.snakes.SnakesProto;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.time.LocalTime;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+
 class ConnectListener implements ActionListener{
     ConnectListener(){
 
@@ -41,7 +47,7 @@ public class GUI {
         CreateField();
         CreateScores();
         CreateGameList();
-        CreateSpecs();
+        CreateSpecs(Model.config);
         CreateButtons();
 
     }
@@ -58,7 +64,7 @@ public class GUI {
         window.setContentPane(game);
         setKeyBindings();
         window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        window.setSize(ox, oy);
+        //window.setSize(ox, oy);
         window.pack();
         window.setVisible(true);
     }
@@ -68,29 +74,40 @@ public class GUI {
     }
 
 
-    public static void Init() { //creates buttons, etc
-        CreateField();
-        CreateGameList();
-        CreateScores();
-        CreateSpecs();
-        CreateButtons();
-    }
+//    public static void Init() { //creates buttons, etc
+//        CreateField();
+//        CreateGameList();
+//        CreateScores();
+//        CreateSpecs(Model.config);
+//        CreateButtons();
+//    }
     public static void repaint(SnakesProto.GameState state){
-        RepaintField();
-        RepaintGameList();
-        RepaintScores();
-        RepaintSpecs();
+        RepaintField(state.getSnakesList());
+        //RepaintGameList(); //another method
+        RepaintScores(state.getPlayers().getPlayersList());
+        RepaintSpecs(state.getConfig());
         RepaintButtons();
-        //show result of addings
     }
     public static void error(String message){
-
+        JFrame f = new JFrame("Error!");
+        JPanel panel = new JPanel();
+        JTextField textField = new JTextField();
+        textField.setBackground(Color.WHITE);
+        textField.setColumns(14); //ширина поля
+        textField.setText(message);
+        panel.add(textField);
+        f.getContentPane().add(panel);
+        f.setSize(400,400);
+        f.pack();
+        f.setLocationRelativeTo(null);
+        f.setVisible(true);
     }
     private static void CreateField() { //adds field to window
         gameField = new JPanel();
-        gameField.setLayout(new GridLayout(oy, ox));
+        //TODO: change 5 to ox, oy
+        gameField.setLayout(new GridLayout(5, 5));
         buttonList = new HashMap<>();
-        for (int i = 0; i < ox*oy; i++){
+        for (int i = 0; i < 5*5; i++){
             buttonList.put(i, new JButton());
             JButton b = buttonList.get(i);
             //System.out.println(b.hashCode());
@@ -98,29 +115,14 @@ public class GUI {
             b.setPreferredSize(new Dimension(checksize,checksize));
             gameField.add(b);
         }
-        gameField.setSize(ox, oy);
+        gameField.setSize(5, 5);
         game.add(gameField);
     }
     private static void CreateGameList() { //jtable with buttons
         gameList = new JPanel();
 
         String[] columnNames = {"Name", "Players", "Size", "Food"};
-        String[][] data = {
-                {"addins", "02.11.2006 19:15", "Folder", ""},
-                {"AppPatch", "03.10.2006 14:10", "Folder", ""},
-                {"assembly", "02.11.2006 14:20", "Folder", ""},
-                {"Boot", "13.10.2007 10:46", "Folder", ""},
-                {"Branding", "13.10.2007 12:10", "Folder", ""},
-                {"Cursors", "23.09.2006 16:34", "Folder", ""},
-                {"Debug", "07.12.2006 17:45", "Folder", ""},
-                {"Fonts", "03.10.2006 14:08", "Folder", ""},
-                {"Help", "08.11.2006 18:23", "Folder", ""},
-                {"explorer.exe", "18.10.2006 14:13", "File", "2,93MB"},
-                {"helppane.exe", "22.08.2006 11:39", "File", "4,58MB"},
-                {"twunk.exe", "19.08.2007 10:37", "File", "1,08MB"},
-                {"nsreg.exe", "07.08.2007 11:14", "File", "2,10MB"},
-                {"avisp.exe", "17.12.2007 16:58", "File", "12,67MB"},
-        };
+        String[][] data = {};
         int size = 14;
         JToolBar toolbar = new JToolBar(SwingConstants.VERTICAL);
         for (int i = 0; i < size; i++){
@@ -138,24 +140,27 @@ public class GUI {
         gameList.add(toolbar);
         rightSide.add(gameList, BorderLayout.SOUTH);
     }
-    private static void CreateSpecs() {
+    private static void CreateSpecs(SnakesProto.GameConfig config) {
         String[] columnNames = {"Type", "Value"};
         String[][] data = {
-                {"addins", "02.11.2006 19:15", "Folder", ""},
-                {"AppPatch", "03.10.2006 14:10", "Folder", ""},
-                {"assembly", "02.11.2006 14:20", "Folder", ""},
-                {"Boot", "13.10.2007 10:46", "Folder", ""},
-                {"Branding", "13.10.2007 12:10", "Folder", ""},
-                {"Cursors", "23.09.2006 16:34", "Folder", ""},
-                {"Debug", "07.12.2006 17:45", "Folder", ""},
-                {"Fonts", "03.10.2006 14:08", "Folder", ""},
-                {"Help", "08.11.2006 18:23", "Folder", ""},
-                {"explorer.exe", "18.10.2006 14:13", "File", "2,93MB"},
-                {"helppane.exe", "22.08.2006 11:39", "File", "4,58MB"},
-                {"twunk.exe", "19.08.2007 10:37", "File", "1,08MB"},
-                {"nsreg.exe", "07.08.2007 11:14", "File", "2,10MB"},
-                {"avisp.exe", "17.12.2007 16:58", "File", "12,67MB"},
+                {"Width", "", ""},
+                {"Height", "", ""},
+                {"food_static", "", ""},
+                {"food_per_player", "", ""},
+                {"state_delay_ms", "", ""},
+                {"dead_food_prob", "", ""},
+                {"ping_delay_ms", "", ""},
+                {"node_timeout_ms", "", ""},
         };
+        String s = "";
+        if (config.hasWidth()) data[0][2] = Integer.toString(config.getWidth());
+        if (config.hasHeight()) data[0][2] = Integer.toString(config.getHeight());
+        if (config.hasFoodStatic()) data[0][2] = Integer.toString(config.getFoodStatic());
+        if (config.hasFoodPerPlayer()) data[0][2] = Float.toString(config.getFoodPerPlayer());
+        if (config.hasStateDelayMs()) data[0][2] = Integer.toString(config.getStateDelayMs());
+        if (config.hasDeadFoodProb()) data[0][2] = Float.toString(config.getDeadFoodProb());
+        if (config.hasPingDelayMs()) data[0][2] = Integer.toString(config.getPingDelayMs());
+        if (config.hasNodeTimeoutMs()) data[0][2] = Integer.toString(config.getNodeTimeoutMs());
         gameSpecs = new JTable(data, columnNames);
         JScrollPane scrollPane = new JScrollPane(gameSpecs);
         scrollPane.setPreferredSize(new Dimension((int)(ox*checksize*0.4), (int)(oy*checksize*0.4)));
@@ -163,22 +168,7 @@ public class GUI {
     }
     private static void CreateScores() {
         String[] columnNames = {"Position", "Name", "Score", "IsMe"};
-        String[][] data = {
-                {"addins", "02.11.2006 19:15", "Folder", ""},
-                {"AppPatch", "03.10.2006 14:10", "Folder", ""},
-                {"assembly", "02.11.2006 14:20", "Folder", ""},
-                {"Boot", "13.10.2007 10:46", "Folder", ""},
-                {"Branding", "13.10.2007 12:10", "Folder", ""},
-                {"Cursors", "23.09.2006 16:34", "Folder", ""},
-                {"Debug", "07.12.2006 17:45", "Folder", ""},
-                {"Fonts", "03.10.2006 14:08", "Folder", ""},
-                {"Help", "08.11.2006 18:23", "Folder", ""},
-                {"explorer.exe", "18.10.2006 14:13", "File", "2,93MB"},
-                {"helppane.exe", "22.08.2006 11:39", "File", "4,58MB"},
-                {"twunk.exe", "19.08.2007 10:37", "File", "1,08MB"},
-                {"nsreg.exe", "07.08.2007 11:14", "File", "2,10MB"},
-                {"avisp.exe", "17.12.2007 16:58", "File", "12,67MB"},
-        };
+        String[][] data = {};
         scores = new JTable(data, columnNames);
         JScrollPane scrollPane = new JScrollPane(scores);
         scrollPane.setPreferredSize(new Dimension((int)(ox*checksize*0.5), (int)(oy*checksize*0.4)));
@@ -207,18 +197,116 @@ public class GUI {
         rightSide.add(buttons, BorderLayout.CENTER);
     }
 
-
-    private static void RepaintField() { //repaints field to window
+    private static void RepaintField(List<SnakesProto.GameState.Snake> snakesList) { //repaints field to window
+        Iterator<SnakesProto.GameState.Snake> iter = snakesList.iterator();
+        while (iter.hasNext()) {
+            List<SnakesProto.GameState.Coord> snakeBody = iter.next().getPointsList();
+            int i = 0;
+            Iterator<SnakesProto.GameState.Coord> it = snakeBody.iterator();
+            SnakesProto.GameState.Coord prev = snakeBody.get(0);
+            while (it.hasNext()){
+                if (i != 0) {
+                    if (it.next().getX() != 0){
+                        int step;
+                        if (it.next().getX() < 0) {
+                            step = -1;
+                        }
+                        else step = 1;
+                        for (int j = prev.getX(); j != it.next().getX(); j = (j + step) % Model.config.getWidth()){
+                            SnakesProto.GameState.Coord.Builder tmp = SnakesProto.GameState.Coord.newBuilder();
+                            tmp.setY(it.next().getY());
+                            tmp.setX(j);
+                            //tail = tmp.build();
+                            //used_checks.put(tmp.build(), iter.next().getPlayerId());
+                            repaintCheck(tmp.build(), iter.next().getPlayerId());
+                            if (it.next().getY() == (j + step) % Model.config.getWidth()){
+                                tmp.setX(it.next().getX());
+                                tmp.setY(it.next().getY());
+                                tmp.build();
+                                //tail = tmp.build();
+                                //used_checks.put(tmp.build(), iter.next().getPlayerId());
+                                repaintCheck(tmp.build(), iter.next().getPlayerId());
+                            }
+                        }
+                    }
+                    else { //y!=0
+                        int step;
+                        if (it.next().getY() < 0) {
+                            step = -1;
+                        }
+                        else step = 1;
+                        for (int j = prev.getY(); j != it.next().getY(); j = (j + step) % Model.config.getHeight()){
+                            SnakesProto.GameState.Coord.Builder tmp = SnakesProto.GameState.Coord.newBuilder();
+                            tmp.setX(it.next().getX());
+                            tmp.setY(j);
+                            tmp.build();
+                            //tail = tmp.build();
+                            //used_checks.put(tmp.build(), iter.next().getPlayerId());
+                            repaintCheck(tmp.build(), iter.next().getPlayerId());
+                            if (it.next().getY() == (j + step) % Model.config.getHeight()){
+                                tmp.setX(it.next().getX());
+                                tmp.setY(it.next().getY());
+                                tmp.build();
+                                //tail = tmp.build();
+                                //used_checks.put(tmp.build(), iter.next().getPlayerId());
+                                repaintCheck(tmp.build(), iter.next().getPlayerId());
+                            }
+                        }
+                    }
+                    prev = it.next();
+                }
+                i++;
+            }
+        }
+    }
+    private static void repaintCheck(SnakesProto.GameState.Coord coord, int playerId){
+        int butNum = coord.getY() * Model.config.getWidth() + coord.getX();
+        if (playerId == Controller.playerId) buttonList.get(butNum).setBackground(Color.YELLOW);
+        else buttonList.get(butNum).setBackground(Color.RED);
+    }
+    public static void repaintGameList(ConcurrentHashMap<String, LocalTime> table) {
 
     }
-    private static void RepaintGameList() {
-
+    private static void RepaintSpecs(SnakesProto.GameConfig config) {
+        String[] columnNames = {"Type", "Value"};
+        String[][] data = {
+                {"Width", "", ""},
+                {"Height", "", ""},
+                {"food_static", "", ""},
+                {"food_per_player", "", ""},
+                {"state_delay_ms", "", ""},
+                {"dead_food_prob", "", ""},
+                {"ping_delay_ms", "", ""},
+                {"node_timeout_ms", "", ""},
+        };
+        String s = "";
+        if (config.hasWidth()) data[0][2] = Integer.toString(config.getWidth());
+        if (config.hasHeight()) data[0][2] = Integer.toString(config.getHeight());
+        if (config.hasFoodStatic()) data[0][2] = Integer.toString(config.getFoodStatic());
+        if (config.hasFoodPerPlayer()) data[0][2] = Float.toString(config.getFoodPerPlayer());
+        if (config.hasStateDelayMs()) data[0][2] = Integer.toString(config.getStateDelayMs());
+        if (config.hasDeadFoodProb()) data[0][2] = Float.toString(config.getDeadFoodProb());
+        if (config.hasPingDelayMs()) data[0][2] = Integer.toString(config.getPingDelayMs());
+        if (config.hasNodeTimeoutMs()) data[0][2] = Integer.toString(config.getNodeTimeoutMs());
+        DefaultTableModel model = new DefaultTableModel(data,columnNames);
+        scores.setModel(model);
+        model.fireTableDataChanged();
     }
-    private static void RepaintSpecs() {
-
-    }
-    private static void RepaintScores() {
-
+    private static void RepaintScores(java.util.List<SnakesProto.GamePlayer> players) {
+        String[] columnNames = {"Position", "Name", "Score", "IsMe"};
+        String[][] data = new String[players.size() + 1][5];
+        Iterator<SnakesProto.GamePlayer> playerIterator = players.iterator();
+        int i = 0;
+        while (playerIterator.hasNext()){
+            data[i][0] = Integer.toString(i+1);
+            data[i][1] = playerIterator.next().getName();
+            data[i][2] = Integer.toString(playerIterator.next().getScore());
+            if (playerIterator.next().getId() == Controller.playerId) data[i][3] = "yes";
+            else data[i][3] = "no";
+        }
+        DefaultTableModel model = new DefaultTableModel(data,columnNames); // for example
+        scores.setModel(model);
+        model.fireTableDataChanged();
     }
     private static void RepaintButtons() {
 
@@ -247,28 +335,31 @@ public class GUI {
                 new AbstractAction() {
                     @Override
                     public void actionPerformed(ActionEvent e) {
-                        Controller.steer(SnakesProto.Direction.UP);
+                        //Controller.steer(SnakesProto.Direction.UP);
+                        System.out.println("UP");
+                        buttonList.get(1).setBackground(Color.RED);
+
                     }
                 });
         game.getActionMap().put("down arrow",
                 new AbstractAction() {
                     @Override
                     public void actionPerformed(ActionEvent e) {
-                        Controller.steer(SnakesProto.Direction.DOWN);
+                        //Controller.steer(SnakesProto.Direction.DOWN);
                     }
                 });
         game.getActionMap().put("left arrow",
                 new AbstractAction() {
                     @Override
                     public void actionPerformed(ActionEvent e) {
-                        Controller.steer(SnakesProto.Direction.LEFT);
+                        //Controller.steer(SnakesProto.Direction.LEFT);
                     }
                 });
         game.getActionMap().put("right arrow",
                 new AbstractAction() {
                     @Override
                     public void actionPerformed(ActionEvent e) {
-                        Controller.steer(SnakesProto.Direction.RIGHT);
+                        //Controller.steer(SnakesProto.Direction.RIGHT);
                     }
                 });
     }

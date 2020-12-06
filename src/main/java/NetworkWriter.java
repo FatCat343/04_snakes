@@ -23,7 +23,7 @@ public class NetworkWriter implements Runnable {
         while (true) {
             SnakesProto.GameMessage message;
             try {
-                message = queue.poll(Controller.ping_delay_ms, TimeUnit.MILLISECONDS);
+                message = queue.poll(Model.config.getPingDelayMs(), TimeUnit.MILLISECONDS);
                 if (message != null) {
                     switch (message.getTypeCase()) {
                         case PING:{
@@ -90,7 +90,7 @@ public class NetworkWriter implements Runnable {
                         //TODO: check on importance of synchronization
                         Iterator<SnakesProto.GamePlayer> iter = msg.branches.iterator();
                         while (iter.hasNext()) {
-                            if (Controller.players.contains(iter.next())) {
+                            if (Model.state.getPlayers().getPlayersList().contains(iter.next())) {
                                 //if needed to be sent to MASTER, finds new MASTER
                                 if (iter.next().getRole().equals(SnakesProto.NodeRole.MASTER)){
                                     SnakesProto.GamePlayer master = Controller.getPlayer(Controller.masterId);
@@ -115,7 +115,7 @@ public class NetworkWriter implements Runnable {
             Iterator<Map.Entry<SnakesProto.GamePlayer, LocalTime>> it = lastSent.entrySet().iterator();
             while (it.hasNext()) {
                 Map.Entry<SnakesProto.GamePlayer, LocalTime> pair = it.next();
-                if (!Controller.players.contains(pair.getKey())) {
+                if (!Model.state.getPlayers().getPlayersList().contains(pair.getKey())) {
                     it.remove();
                     continue;
                 }
@@ -165,7 +165,7 @@ public class NetworkWriter implements Runnable {
         MessageCustom mst = new MessageCustom();
         mst.gm = message;
         //TODO : check if conroller.players changes between init of branches and iteration(client leaves or comes)
-        mst.branches = new ArrayList<>(Controller.players);
+        mst.branches = new ArrayList<>(Model.state.getPlayers().getPlayersList());
         //TODO: mb sync branches iteration
         //our gameplayer, not resend to ourself
         mst.branches.removeIf(pl -> pl.getId() == Controller.playerId);
@@ -183,7 +183,7 @@ public class NetworkWriter implements Runnable {
             invoketime = mst.origtime.plusNanos(Model.config.getPingDelayMs() * 1000000);
         }
         //TODO: make iteration synchronized
-        for (SnakesProto.GamePlayer gamePlayer : Controller.players) {
+        for (SnakesProto.GamePlayer gamePlayer : Model.state.getPlayers().getPlayersList()) {
             Network.send(message, gamePlayer);
         }
     }
@@ -238,7 +238,8 @@ public class NetworkWriter implements Runnable {
             //works with up-to-date player
             SnakesProto.GamePlayer player = Controller.getPlayer(it.next().getId());
             if (player == null) continue;
-            Controller.players.remove(player);
+            //Model.state.getPlayers().getPlayersList().remove(player);
+            Model.disconnect(player.getId());
             //we are normal, delete master
             if ((player.getRole().equals(SnakesProto.NodeRole.MASTER)) && (Objects.equals(Controller.getRole(Controller.playerId), SnakesProto.NodeRole.NORMAL))){
                 Controller.changeMaster();

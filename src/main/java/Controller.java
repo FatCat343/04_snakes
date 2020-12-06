@@ -8,13 +8,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class Controller {
-    public static List<SnakesProto.GamePlayer> players = new ArrayList<>(); //list of ALL clients
+    //public static List<SnakesProto.GamePlayer> players = new ArrayList<>(); //list of ALL clients
     public static int playerId = 0;
     public static int masterId = 1;
     public static SnakesProto.NodeRole role = null;
     //TODO: some fields are in game config
-    public static int ping_delay_ms = 100;
-    public static int node_timeout_ms = 800;
+    //public static int ping_delay_ms = 100;
+    //public static int node_timeout_ms = 800;
     //public static SnakesProto.GameConfig config;
     //public static ConcurrentHashMap<String, State> states = new ConcurrentHashMap<String, State>();
     public static void main(String[] args) {
@@ -29,7 +29,7 @@ public class Controller {
         //changes state of ours snake
         Model.config = gm.getState().getState().getConfig();
         //TODO: make change synchronized
-        players = gm.getState().getState().getPlayers().getPlayersList();
+        //players = gm.getState().getState().getPlayers().getPlayersList();
         Model.setState(gm.getState().getState());
         Model.sendAck(gm, getId(sender));
     }
@@ -63,7 +63,7 @@ public class Controller {
     }
     public static void join(SnakesProto.GameMessage gm, Sender sender){
         Model.join(gm, sender);
-        Model.sendAck(gm, getId(sender));
+        //Model.sendAck(gm, getId(sender));
     }
     public static void roleChange(SnakesProto.GameMessage gm, Sender sender){
         if (gm.getRoleChange().hasSenderRole()){
@@ -74,7 +74,7 @@ public class Controller {
                     }
                 }
                 else {
-                    Model.deletePlayer(gm.getSenderId());
+                    Model.becomeViewer(gm.getSenderId());
                 }
             }
             if (gm.getRoleChange().getSenderRole().equals(SnakesProto.NodeRole.MASTER)){
@@ -83,7 +83,7 @@ public class Controller {
                         findDeputy();
                     }
                     if (gm.getRoleChange().getReceiverRole().equals(SnakesProto.NodeRole.VIEWER)){
-                        Model.dead();
+                        Model.becomeViewer(Controller.playerId);
                     }
                 }
                 else {
@@ -95,9 +95,10 @@ public class Controller {
             if (gm.getRoleChange().hasReceiverRole()){
                 if (gm.getRoleChange().getReceiverRole().equals(SnakesProto.NodeRole.DEPUTY)){
                     //become deputy
+                    Controller.role = SnakesProto.NodeRole.DEPUTY;
                 }
                 if (gm.getRoleChange().getReceiverRole().equals(SnakesProto.NodeRole.VIEWER)){
-                    Model.dead();
+                    Model.becomeViewer(Controller.playerId);
                 }
             }
 
@@ -115,7 +116,7 @@ public class Controller {
     }
     public static SnakesProto.NodeRole getRole(int searchId){
         //TODO: sync iteration
-        Iterator<SnakesProto.GamePlayer> iter = players.iterator();
+        Iterator<SnakesProto.GamePlayer> iter = Model.state.getPlayers().getPlayersList().iterator();
         while (iter.hasNext()) {
             if (iter.next().getId() == searchId) {
                 return iter.next().getRole();
@@ -125,7 +126,7 @@ public class Controller {
     }
     public static int getId(Sender sender){
         //TODO: sync iteration
-        Iterator<SnakesProto.GamePlayer> iter = players.iterator();
+        Iterator<SnakesProto.GamePlayer> iter = Model.state.getPlayers().getPlayersList().iterator();
         while (iter.hasNext()) {
             if ((iter.next().getIpAddress().equals(sender.ip)) && (iter.next().getPort() == sender.port)) {
                 return iter.next().getId();
@@ -135,7 +136,7 @@ public class Controller {
     }
     public static SnakesProto.GamePlayer getPlayer(Sender sender){
         //TODO: make synchronized iteration
-        Iterator<SnakesProto.GamePlayer> iter = players.iterator();
+        Iterator<SnakesProto.GamePlayer> iter = Model.state.getPlayers().getPlayersList().iterator();
         while (iter.hasNext()) {
             if ((iter.next().getIpAddress().equals(sender.ip)) && (iter.next().getPort() == sender.port)) {
                 return iter.next();
@@ -145,7 +146,7 @@ public class Controller {
     }
     public static SnakesProto.GamePlayer getPlayer(int searchId){
         //TODO: make synchronized iteration
-        Iterator<SnakesProto.GamePlayer> iter = players.iterator();
+        Iterator<SnakesProto.GamePlayer> iter = Model.state.getPlayers().getPlayersList().iterator();
         while (iter.hasNext()) {
             if (iter.next().getId() == searchId) {
                 return iter.next();
@@ -155,7 +156,7 @@ public class Controller {
     }
     public static void changeMaster(){
         //find deputy, change info about master to deputy
-        Iterator<SnakesProto.GamePlayer> iter = players.iterator();
+        Iterator<SnakesProto.GamePlayer> iter = Model.state.getPlayers().getPlayersList().iterator();
         while (iter.hasNext()) {
             if (iter.next().getRole().equals(SnakesProto.NodeRole.DEPUTY)) {
                 masterId = iter.next().getId();
@@ -164,7 +165,7 @@ public class Controller {
     }
     public static void findDeputy(){
         //find new deputy in players map
-        Iterator<SnakesProto.GamePlayer> iter = players.iterator();
+        Iterator<SnakesProto.GamePlayer> iter = Model.state.getPlayers().getPlayersList().iterator();
         while (iter.hasNext()) {
             if (iter.next().getRole().equals(SnakesProto.NodeRole.NORMAL)) {
                 Model.setDeputy(iter.next().getId());
