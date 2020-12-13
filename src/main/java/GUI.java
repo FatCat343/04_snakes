@@ -11,15 +11,17 @@ import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 class ConnectListener implements ActionListener{
-    ConnectListener(){
-
+    private final Sender sender;
+    ConnectListener(Sender s){
+        sender = s;
     }
     @Override
     public void actionPerformed(ActionEvent e) {
-        Controller.connect();
+        Controller.connect(sender);
     }
 }
 
@@ -31,16 +33,16 @@ public class GUI {
     private static JPanel tables;
     private static JTable scores;
     private static JTable gameSpecs;
-    private static JPanel gameList;
+    private static JTable gamelistinfo;
     private static JPanel buttons;
     private static JPanel gameField;
     private static JButton newGame;
     private static JButton exit;
-    public static int ox = 40;
-    public static int oy = 30;
+    public static int ox;
+    public static int oy;
     public static int checksize = 20;
     private static HashMap<Integer, JButton> buttonList;
-
+    private static HashMap<Integer, JButton> connectButtons;
     private static void createUIComponents() {
         game = new JPanel();
 
@@ -51,8 +53,10 @@ public class GUI {
         CreateButtons();
 
     }
-    public static void init() {
+    public static void init(SnakesProto.GameConfig config) {
         //JFrame window = new JFrame("snake");
+        ox = config.getWidth();
+        oy = config.getHeight();
         rightSide = new JPanel();
         rightSide.setLayout(new BorderLayout());
         tables= new JPanel();
@@ -69,9 +73,9 @@ public class GUI {
         window.setVisible(true);
     }
 
-    public static void main(String[] args) {
-        init();
-    }
+//    public static void main(String[] args) {
+//        init();
+//    }
 
 
 //    public static void Init() { //creates buttons, etc
@@ -81,9 +85,12 @@ public class GUI {
 //        CreateSpecs(Model.config);
 //        CreateButtons();
 //    }
-    public static void repaint(SnakesProto.GameState state){
+    public static void repaint(SnakesProto.GameState state, ConcurrentHashMap<GameListMessage, LocalTime> table){
+        System.out.println(state);
+        ox = state.getConfig().getWidth();
+        oy = state.getConfig().getHeight();
         RepaintField(state.getSnakesList());
-        //RepaintGameList(); //another method
+        repaintGameList(table); //another method
         RepaintScores(state.getPlayers().getPlayersList());
         RepaintSpecs(state.getConfig());
         RepaintButtons();
@@ -105,9 +112,9 @@ public class GUI {
     private static void CreateField() { //adds field to window
         gameField = new JPanel();
         //TODO: change 5 to ox, oy
-        gameField.setLayout(new GridLayout(5, 5));
+        gameField.setLayout(new GridLayout(oy, oy));
         buttonList = new HashMap<>();
-        for (int i = 0; i < 5*5; i++){
+        for (int i = 0; i < ox*oy; i++){
             buttonList.put(i, new JButton());
             JButton b = buttonList.get(i);
             //System.out.println(b.hashCode());
@@ -115,23 +122,24 @@ public class GUI {
             b.setPreferredSize(new Dimension(checksize,checksize));
             gameField.add(b);
         }
-        gameField.setSize(5, 5);
+        gameField.setSize(ox, oy);
         game.add(gameField);
     }
     private static void CreateGameList() { //jtable with buttons
-        gameList = new JPanel();
-
+        JPanel gameList = new JPanel();
+        connectButtons = new HashMap<>();
         String[] columnNames = {"Name", "Players", "Size", "Food"};
         String[][] data = {};
         int size = 14;
         JToolBar toolbar = new JToolBar(SwingConstants.VERTICAL);
         for (int i = 0; i < size; i++){
-            JButton b = new JButton("name " + "connect");
-            b.addActionListener(new ConnectListener());
+            JButton b = new JButton("name" + " : connect");
+            //b.addActionListener(new ConnectListener());
             b.setPreferredSize(new Dimension(checksize, 10));
             toolbar.add(b);
+            connectButtons.put(i, b);
         }
-        JTable gamelistinfo = new JTable(data, columnNames);
+        gamelistinfo = new JTable(data, columnNames);
         gamelistinfo.setRowHeight(20);
         JScrollPane scrollPane = new JScrollPane(gamelistinfo);
         scrollPane.setPreferredSize(new Dimension((int)(ox*checksize*0.4), (int)(oy*checksize*0.5)));
@@ -153,14 +161,14 @@ public class GUI {
                 {"node_timeout_ms", "", ""},
         };
         String s = "";
-        if (config.hasWidth()) data[0][2] = Integer.toString(config.getWidth());
-        if (config.hasHeight()) data[0][2] = Integer.toString(config.getHeight());
-        if (config.hasFoodStatic()) data[0][2] = Integer.toString(config.getFoodStatic());
-        if (config.hasFoodPerPlayer()) data[0][2] = Float.toString(config.getFoodPerPlayer());
-        if (config.hasStateDelayMs()) data[0][2] = Integer.toString(config.getStateDelayMs());
-        if (config.hasDeadFoodProb()) data[0][2] = Float.toString(config.getDeadFoodProb());
-        if (config.hasPingDelayMs()) data[0][2] = Integer.toString(config.getPingDelayMs());
-        if (config.hasNodeTimeoutMs()) data[0][2] = Integer.toString(config.getNodeTimeoutMs());
+        data[0][1] = Integer.toString(config.getWidth());
+        data[1][1] = Integer.toString(config.getHeight());
+        data[2][1] = Integer.toString(config.getFoodStatic());
+        data[3][1] = Float.toString(config.getFoodPerPlayer());
+        data[4][1] = Integer.toString(config.getStateDelayMs());
+        data[5][1] = Float.toString(config.getDeadFoodProb());
+        data[6][1] = Integer.toString(config.getPingDelayMs());
+        data[7][1] = Integer.toString(config.getNodeTimeoutMs());
         gameSpecs = new JTable(data, columnNames);
         JScrollPane scrollPane = new JScrollPane(gameSpecs);
         scrollPane.setPreferredSize(new Dimension((int)(ox*checksize*0.4), (int)(oy*checksize*0.4)));
@@ -198,74 +206,112 @@ public class GUI {
     }
 
     private static void RepaintField(List<SnakesProto.GameState.Snake> snakesList) { //repaints field to window
+        //System.out.println("repaintfield called");
+
+        for (int i = 0; i < ox * oy; i++){
+            JButton b = buttonList.get(i);
+            b.setBackground(Color.BLACK);
+        }
+
         Iterator<SnakesProto.GameState.Snake> iter = snakesList.iterator();
         while (iter.hasNext()) {
-            List<SnakesProto.GameState.Coord> snakeBody = iter.next().getPointsList();
+            SnakesProto.GameState.Snake snake = iter.next();
+            List<SnakesProto.GameState.Coord> snakeBody = snake.getPointsList();
             int i = 0;
             Iterator<SnakesProto.GameState.Coord> it = snakeBody.iterator();
             SnakesProto.GameState.Coord prev = snakeBody.get(0);
+            SnakesProto.GameState.Coord.Builder tmp = SnakesProto.GameState.Coord.newBuilder();
             while (it.hasNext()){
+                SnakesProto.GameState.Coord coord = it.next();
                 if (i != 0) {
-                    if (it.next().getX() != 0){
+                    if (coord.getX() != 0){
                         int step;
-                        if (it.next().getX() < 0) {
+                        if (coord.getX() < 0) {
                             step = -1;
                         }
                         else step = 1;
-                        for (int j = prev.getX(); j != it.next().getX(); j = (j + step) % Model.config.getWidth()){
-                            SnakesProto.GameState.Coord.Builder tmp = SnakesProto.GameState.Coord.newBuilder();
-                            tmp.setY(it.next().getY());
+                        for (int j = prev.getX(); j != (Model.config.getWidth() + coord.getX() + prev.getX()) % Model.config.getWidth(); j = (Model.config.getWidth() + j + step) % Model.config.getWidth()){
+                            tmp.setY(prev.getY());
                             tmp.setX(j);
                             //tail = tmp.build();
                             //used_checks.put(tmp.build(), iter.next().getPlayerId());
-                            repaintCheck(tmp.build(), iter.next().getPlayerId());
-                            if (it.next().getY() == (j + step) % Model.config.getWidth()){
-                                tmp.setX(it.next().getX());
-                                tmp.setY(it.next().getY());
-                                tmp.build();
-                                //tail = tmp.build();
-                                //used_checks.put(tmp.build(), iter.next().getPlayerId());
-                                repaintCheck(tmp.build(), iter.next().getPlayerId());
-                            }
+                            repaintCheck(tmp.build(), snake.getPlayerId());
+//                            if (coord.getY() == (j + step) % Model.config.getWidth()){
+//                                tmp.setX(coord.getX());
+//                                tmp.setY(coord.getY());
+//                                tmp.build();
+//                                //tail = tmp.build();
+//                                //used_checks.put(tmp.build(), iter.next().getPlayerId());
+//                                repaintCheck(tmp.build(), snake.getPlayerId());
+//                            }
                         }
+                        repaintCheck(tmp.setX((Model.config.getWidth() + coord.getX() + prev.getX()) % Model.config.getWidth()).build(), snake.getPlayerId());
                     }
                     else { //y!=0
                         int step;
-                        if (it.next().getY() < 0) {
+                        if (coord.getY() < 0) {
                             step = -1;
                         }
                         else step = 1;
-                        for (int j = prev.getY(); j != it.next().getY(); j = (j + step) % Model.config.getHeight()){
-                            SnakesProto.GameState.Coord.Builder tmp = SnakesProto.GameState.Coord.newBuilder();
-                            tmp.setX(it.next().getX());
+                        for (int j = prev.getY(); j != (Model.config.getHeight() + coord.getY() + prev.getY()) % Model.config.getHeight(); j = (Model.config.getHeight() + j + step) % Model.config.getHeight()){
+                            tmp.setX(prev.getX());
                             tmp.setY(j);
-                            tmp.build();
+                            //tmp.build();
                             //tail = tmp.build();
                             //used_checks.put(tmp.build(), iter.next().getPlayerId());
-                            repaintCheck(tmp.build(), iter.next().getPlayerId());
-                            if (it.next().getY() == (j + step) % Model.config.getHeight()){
-                                tmp.setX(it.next().getX());
-                                tmp.setY(it.next().getY());
-                                tmp.build();
-                                //tail = tmp.build();
-                                //used_checks.put(tmp.build(), iter.next().getPlayerId());
-                                repaintCheck(tmp.build(), iter.next().getPlayerId());
-                            }
+                            repaintCheck(tmp.build(), snake.getPlayerId()); //?
+//                            if (coord.getY() == (j + step) % Model.config.getHeight()){
+//                                tmp.setX(coord.getX());
+//                                tmp.setY(coord.getY());
+//                                //tmp.build();
+//                                //tail = tmp.build();
+//                                //used_checks.put(tmp.build(), iter.next().getPlayerId());
+//                                //System.out.println("repaint check");
+//                                repaintCheck(tmp.build(), snake.getPlayerId());
+//                            }
                         }
+                        repaintCheck(tmp.setY((Model.config.getHeight() + coord.getY() + prev.getY()) % Model.config.getHeight()).setX(prev.getX()).build(), snake.getPlayerId());
                     }
-                    prev = it.next();
+                    prev = tmp.build();
                 }
                 i++;
             }
         }
+        //Iterator
     }
     private static void repaintCheck(SnakesProto.GameState.Coord coord, int playerId){
+        System.out.println("repaintcheck ox = " + coord.getX() + ", oy = " + coord.getY());
         int butNum = coord.getY() * Model.config.getWidth() + coord.getX();
         if (playerId == Controller.playerId) buttonList.get(butNum).setBackground(Color.YELLOW);
         else buttonList.get(butNum).setBackground(Color.RED);
     }
-    public static void repaintGameList(ConcurrentHashMap<String, LocalTime> table) {
-
+    public static void repaintGameList(ConcurrentHashMap<GameListMessage, LocalTime> table) {
+        String[] columnNames = {"Name", "Players", "Size", "Food"};
+        String[][] data = new String[table.size() + 1][5];
+        int i = 0;
+        //TODO: sync
+        Iterator<Map.Entry<GameListMessage, LocalTime>> it = table.entrySet().iterator();
+        while(it.hasNext()){
+            Map.Entry<GameListMessage, LocalTime> pair = it.next();
+            data[i][0] = pair.getKey().sender.ip;
+            data[i][1] = Integer.toString(pair.getKey().announce.getPlayers().getPlayersList().size());
+            data[i][2] = pair.getKey().announce.getConfig().getWidth() + "x" +
+                         pair.getKey().announce.getConfig().getHeight();
+            data[i][3] = pair.getKey().announce.getConfig().getFoodStatic() + "+" +
+                         pair.getKey().announce.getConfig().getFoodPerPlayer() + "x";
+            JButton b = connectButtons.get(i);
+            ActionListener[] list = b.getActionListeners();
+            //System.out.println(b.hashCode());
+            if (list.length > 0) b.removeActionListener(list[0]);
+            b.setBackground(Color.BLUE);
+            b.setName(i + " : connect");
+            //System.out.println("changed name for button");
+            b.addActionListener(new ConnectListener(pair.getKey().sender));
+            connectButtons.put(i, b);
+        }
+        DefaultTableModel model = new DefaultTableModel(data,columnNames); // for example
+        gamelistinfo.setModel(model);
+        model.fireTableDataChanged();
     }
     private static void RepaintSpecs(SnakesProto.GameConfig config) {
         String[] columnNames = {"Type", "Value"};
@@ -289,7 +335,7 @@ public class GUI {
         if (config.hasPingDelayMs()) data[0][2] = Integer.toString(config.getPingDelayMs());
         if (config.hasNodeTimeoutMs()) data[0][2] = Integer.toString(config.getNodeTimeoutMs());
         DefaultTableModel model = new DefaultTableModel(data,columnNames);
-        scores.setModel(model);
+        gameSpecs.setModel(model);
         model.fireTableDataChanged();
     }
     private static void RepaintScores(java.util.List<SnakesProto.GamePlayer> players) {
@@ -298,10 +344,11 @@ public class GUI {
         Iterator<SnakesProto.GamePlayer> playerIterator = players.iterator();
         int i = 0;
         while (playerIterator.hasNext()){
+            SnakesProto.GamePlayer player = playerIterator.next();
             data[i][0] = Integer.toString(i+1);
-            data[i][1] = playerIterator.next().getName();
-            data[i][2] = Integer.toString(playerIterator.next().getScore());
-            if (playerIterator.next().getId() == Controller.playerId) data[i][3] = "yes";
+            data[i][1] = player.getName();
+            data[i][2] = Integer.toString(player.getScore());
+            if (player.getId() == Controller.playerId) data[i][3] = "yes";
             else data[i][3] = "no";
         }
         DefaultTableModel model = new DefaultTableModel(data,columnNames); // for example
@@ -335,9 +382,9 @@ public class GUI {
                 new AbstractAction() {
                     @Override
                     public void actionPerformed(ActionEvent e) {
-                        //Controller.steer(SnakesProto.Direction.UP);
-                        System.out.println("UP");
-                        buttonList.get(1).setBackground(Color.RED);
+                        Controller.steer(SnakesProto.Direction.UP);
+                        //System.out.println("UP");
+                        //buttonList.get(1).setBackground(Color.RED);
 
                     }
                 });
@@ -345,21 +392,21 @@ public class GUI {
                 new AbstractAction() {
                     @Override
                     public void actionPerformed(ActionEvent e) {
-                        //Controller.steer(SnakesProto.Direction.DOWN);
+                        Controller.steer(SnakesProto.Direction.DOWN);
                     }
                 });
         game.getActionMap().put("left arrow",
                 new AbstractAction() {
                     @Override
                     public void actionPerformed(ActionEvent e) {
-                        //Controller.steer(SnakesProto.Direction.LEFT);
+                        Controller.steer(SnakesProto.Direction.LEFT);
                     }
                 });
         game.getActionMap().put("right arrow",
                 new AbstractAction() {
                     @Override
                     public void actionPerformed(ActionEvent e) {
-                        //Controller.steer(SnakesProto.Direction.RIGHT);
+                        Controller.steer(SnakesProto.Direction.RIGHT);
                     }
                 });
     }

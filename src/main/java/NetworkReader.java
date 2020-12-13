@@ -33,6 +33,16 @@ public class NetworkReader implements Runnable{
                 }
             }
             if (alreadyReceived == 1) continue;
+            //TODO: check if we need messages from this sender
+            if (Model.state == null){
+                if (!Controller.neededsenders.contains(sender)) continue;
+            }
+            else {
+                if (Controller.getId(sender) == -1){
+                    continue;
+                }
+            }
+
             //check whether we have msg of same type from same sender
             //TODO: make iteration synchronised
             received.entrySet().removeIf(pair -> ((pair.getKey().equals(sender)) && (pair.getValue().getTypeCase().equals(gm.getTypeCase()))));
@@ -58,7 +68,7 @@ public class NetworkReader implements Runnable{
                     Controller.join(gm, sender);
                 }
                 case ERROR:{
-                    Controller.error(gm);
+                    Controller.error(gm, sender);
                 }
                 case ROLE_CHANGE:{
                     Controller.roleChange(gm, sender);

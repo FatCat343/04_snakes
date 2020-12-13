@@ -7,13 +7,14 @@ import java.io.ObjectInputStream;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 
 public class Network {
     public static SnakesProto.GameMessage receive(Sender sender){
         try {
-            byte[] recvBuf = new byte[5000];
+            byte[] recvBuf = new byte[64000];
             DatagramPacket packet = new DatagramPacket(recvBuf, recvBuf.length);
             //System.out.println("port = " +Client.port);
 
@@ -21,19 +22,19 @@ public class Network {
             sender.ip = packet.getAddress().toString();
             sender.port = packet.getPort();
             //System.out.println("received");
-            int byteCount = packet.getLength();
-            ByteArrayInputStream byteStream = new ByteArrayInputStream(recvBuf);
-            ObjectInputStream is = new ObjectInputStream(new BufferedInputStream(byteStream));
-            Object o = is.readObject();
-            is.close();
-            SnakesProto.GameMessage msg = SnakesProto.GameMessage.parseFrom(recvBuf);
+            //int byteCount = packet.getLength();
+            //ByteArrayInputStream byteStream = new ByteArrayInputStream(recvBuf);
+            //ObjectInputStream is = new ObjectInputStream(new BufferedInputStream(byteStream));
+            //Object o = is.readObject();
+            //is.close();
+            SnakesProto.GameMessage msg = SnakesProto.GameMessage.parseFrom(Arrays.copyOf(packet.getData(), packet.getLength()));
             return msg;
         }
         catch (IOException e) {
                 System.err.println("Exception:  " + e);
                 e.printStackTrace();
             }
-        catch (ClassNotFoundException e) { e.printStackTrace(); }
+        //catch (ClassNotFoundException e) { e.printStackTrace(); }
         return null;
     }
     public static void send(SnakesProto.GameMessage msg, SnakesProto.GamePlayer receiver) {

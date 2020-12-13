@@ -11,33 +11,96 @@ import static me.ippolitov.fit.snakes.SnakesProto.Direction.*;
 
 public class GameProcess implements Runnable {
     public static ConcurrentHashMap<Integer, SnakesProto.Direction> steers = new ConcurrentHashMap<>();
-    public static SnakesProto.GameState.Builder gameState = SnakesProto.GameState.newBuilder();
+    public static SnakesProto.GameState.Builder gameState;
     public static int aliveSnakes;
+    public static boolean running;
+    private static int stateOrder = 0;
+    GameProcess(){
+        gameState = SnakesProto.GameState.newBuilder();
+        gameState.setConfig(Model.config);
+        gameState.setStateOrder(getStateOrder());
+        Controller.playerId = 0;
+        SnakesProto.GameState.Snake res = findPlace(0);
+        if (res != null) {
+            //can be added, snake already placed + configured (or not)
+            SnakesProto.GamePlayer.Builder p = SnakesProto.GamePlayer.newBuilder();
+
+            p.setId(res.getPlayerId());
+            p.setName(Controller.name);
+            p.setIpAddress("1.1.1.1");
+            p.setPort(Controller.port);
+            p.setRole(SnakesProto.NodeRole.NORMAL);
+            p.setScore(0);
+
+            //gameState.getPlayers().getPlayersList().add(p.build());
+            //List<SnakesProto.GamePlayer> pl = gameState.getPlayers().getPlayersList();
+            //pl.add(p.build());
+            gameState.addSnakes(res);
+            SnakesProto.GamePlayers.Builder pls = SnakesProto.GamePlayers.newBuilder();
+            pls.addPlayers(p);
+            gameState.setPlayers(pls);
+            //
+            Model.setState(gameState.build());
+            GameListSender.start();
+            //Model.sendAck(gm, Controller.getId(sender));
+        }
+        else {
+            //cant
+            GUI.error("Cant start a game");
+            Model.exit();
+        }
+    }
+    GameProcess(SnakesProto.GameState state){
+        gameState = SnakesProto.GameState.newBuilder(state);
+        Controller.findDeputy();
+    }
+
     public void run() {
-        while(true) {
+        while(running) {
             try {
                 sleep(2000);
+                System.out.println("do turn");
                 doTurn();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            gameState.setStateOrder(gameState.getStateOrder() + 1);
+            gameState.setStateOrder(getStateOrder());
             Model.setState(gameState.build());
             Model.sendState(gameState.build());
-            Model.showState(gameState.build());
+            //Model.showState(gameState.build());
         }
     }
     public static void start() {
         Thread t = new Thread(new GameProcess());
+        running = true;
         t.start();
+    }
+    public static void continueGame(SnakesProto.GameState state){
+        Thread t = new Thread(new GameProcess(state));
+        running = true;
+        t.start();
+    }
+    public static void changeState(int id, SnakesProto.NodeRole role){
+        //TODO: sync
+        List<SnakesProto.GamePlayer> playerList = gameState.getPlayers().getPlayersList();
+        for (int i = 0; i < playerList.size(); i++) {
+            if (playerList.get(i).getId() == id) {
+                SnakesProto.GamePlayer.Builder player = SnakesProto.GamePlayer.newBuilder(playerList.get(i));
+                player.setRole(role);
+                playerList.set(i, player.build());
+                break;
+            }
+        }
+        Model.setState(gameState.build());
     }
     public static void setSteer(SnakesProto.Direction dir, int id){
         //TODO: sync iteration
         List<SnakesProto.GameState.Snake> snakesList = gameState.getSnakesList();
         Iterator<SnakesProto.GameState.Snake> iter = snakesList.iterator();
         while (iter.hasNext()) {
-            if (iter.next().getPlayerId() == id) {
-                switch (iter.next().getHeadDirection()) {
+            SnakesProto.GameState.Snake snake = iter.next();
+            if (snake.getPlayerId() == id) {
+                switch (snake.getHeadDirection()) {
                     case UP: if (!dir.equals(DOWN)) steers.put(id, dir);
                     case DOWN: if (!dir.equals(UP)) steers.put(id, dir);
                     case LEFT: if (!dir.equals(RIGHT)) steers.put(id, dir);
@@ -46,6 +109,49 @@ public class GameProcess implements Runnable {
                 break;
             }
         }
+    }
+    public static void makeZombie(int playerId){
+        //TODO: sync
+        List<SnakesProto.GameState.Snake> snakesList = gameState.getSnakesList();
+        for (int i = 0; i < snakesList.size(); i++) {
+            if (snakesList.get(i).getPlayerId() == playerId) {
+                SnakesProto.GameState.Snake.Builder snake = SnakesProto.GameState.Snake.newBuilder(snakesList.get(i));
+                snake.setState(SnakesProto.GameState.Snake.SnakeState.ZOMBIE);
+                snake.setPlayerId(newZombieSnakeid());
+                break;
+            }
+        }
+        aliveSnakes--;
+        Model.setState(gameState.build());
+    }
+    public static void deletePlayer(int playerId){
+        //TODO: sync
+        gameState.getPlayers().getPlayersList().remove(playerId);
+        Model.setState(gameState.build());
+    }
+    private static int newZombieSnakeid(){
+        //TODO: sync
+        List<SnakesProto.GameState.Snake> snakesList = gameState.getSnakesList();
+        int id = -1;
+        while (true) {
+            int i;
+            for (i = 0; i < snakesList.size(); i++) {
+                if (snakesList.get(i).getPlayerId() == id) {
+                    break;
+                }
+            }
+            if (i < snakesList.size()){  //found id somewhere
+                id--;
+            }
+            else { //didnt found
+                break;
+            }
+        }
+        return id;
+    }
+    private static int getStateOrder(){
+        stateOrder++;
+        return stateOrder;
     }
     public static void newPlayer(SnakesProto.GameMessage gm, Sender sender){
         SnakesProto.GameState.Snake res = findPlace(newPlayerId()); //finds + places if possible
@@ -77,57 +183,59 @@ public class GameProcess implements Runnable {
         List<SnakesProto.GameState.Snake> snakesList = gameState.getSnakesList();
         Iterator<SnakesProto.GameState.Snake> iter = snakesList.iterator();
         while (iter.hasNext()) {
-            List<SnakesProto.GameState.Coord> snakeBody = iter.next().getPointsList();
+            SnakesProto.GameState.Snake snake = iter.next();
+            List<SnakesProto.GameState.Coord> snakeBody = snake.getPointsList();
             int i = 0;
             Iterator<SnakesProto.GameState.Coord> it = snakeBody.iterator();
             SnakesProto.GameState.Coord prev = snakeBody.get(0);
             //SnakesProto.GameState.Coord tail = snakeBody.get(0);
             while (it.hasNext()){
+                SnakesProto.GameState.Coord coord = it.next();
                 if (i != 0) {
-                    if (it.next().getX() != 0){
+                    if (coord.getX() != 0){
                         int step;
-                        if (it.next().getX() < 0) {
+                        if (coord.getX() < 0) {
                             step = -1;
                         }
                         else step = 1;
-                        for (int j = prev.getX(); j != it.next().getX(); j = (j + step) % Model.config.getWidth()){
+                        for (int j = prev.getX(); j != coord.getX(); j = (j + step) % Model.config.getWidth()){
                             SnakesProto.GameState.Coord.Builder tmp = SnakesProto.GameState.Coord.newBuilder();
-                            tmp.setY(it.next().getY());
+                            tmp.setY(coord.getY());
                             tmp.setX(j);
                             //tail = tmp.build();
-                            used_checks.put(tmp.build(), iter.next().getPlayerId());
-                            if (it.next().getY() == (j + step) % Model.config.getWidth()){
-                                tmp.setX(it.next().getX());
-                                tmp.setY(it.next().getY());
+                            used_checks.put(tmp.build(), snake.getPlayerId());
+                            if (coord.getY() == (j + step) % Model.config.getWidth()){
+                                tmp.setX(coord.getX());
+                                tmp.setY(coord.getY());
                                 tmp.build();
                                 //tail = tmp.build();
-                                used_checks.put(tmp.build(), iter.next().getPlayerId());
+                                used_checks.put(tmp.build(), snake.getPlayerId());
                             }
                         }
                     }
                     else { //y!=0
                         int step;
-                        if (it.next().getY() < 0) {
+                        if (coord.getY() < 0) {
                             step = -1;
                         }
                         else step = 1;
-                        for (int j = prev.getY(); j != it.next().getY(); j = (j + step) % Model.config.getHeight()){
+                        for (int j = prev.getY(); j != coord.getY(); j = (j + step) % Model.config.getHeight()){
                             SnakesProto.GameState.Coord.Builder tmp = SnakesProto.GameState.Coord.newBuilder();
-                            tmp.setX(it.next().getX());
+                            tmp.setX(coord.getX());
                             tmp.setY(j);
                             tmp.build();
                             //tail = tmp.build();
-                            used_checks.put(tmp.build(), iter.next().getPlayerId());
-                            if (it.next().getY() == (j + step) % Model.config.getHeight()){
-                                tmp.setX(it.next().getX());
-                                tmp.setY(it.next().getY());
+                            used_checks.put(tmp.build(), snake.getPlayerId());
+                            if (coord.getY() == (j + step) % Model.config.getHeight()){
+                                tmp.setX(coord.getX());
+                                tmp.setY(coord.getY());
                                 tmp.build();
                                 //tail = tmp.build();
-                                used_checks.put(tmp.build(), iter.next().getPlayerId());
+                                used_checks.put(tmp.build(), snake.getPlayerId());
                             }
                         }
                     }
-                    prev = it.next();
+                    prev = coord;
                 }
                 i++;
             }
@@ -153,21 +261,21 @@ public class GameProcess implements Runnable {
         SnakesProto.GameState.Snake.Builder snake = SnakesProto.GameState.Snake.newBuilder();
         if (foundPlace == 0) return null;
         else {
-            snake.setPoints(0, tmp.setX((tmp.getX() + 2) % Model.config.getWidth()).setY((tmp.getY() + 2) % Model.config.getHeight()).build());
-            snake.setPoints(1, tmp.setX((tmp.getX() + 1) % Model.config.getWidth()).setY((tmp.getY() + 1) % Model.config.getHeight()).build());
+            SnakesProto.GameState.Coord.Builder coord = SnakesProto.GameState.Coord.newBuilder
+                    (tmp.setX((tmp.getX() + 2) % Model.config.getWidth()).setY((tmp.getY() + 2) % Model.config.getHeight()).build());
+            snake.addPoints(0, coord.build());
+            //snake.setPoints(0, tmp.setX((tmp.getX() + 2) % Model.config.getWidth()).setY((tmp.getY() + 2) % Model.config.getHeight()).build());
+            //snake.setPoints(1, tmp.setX((tmp.getX() + 1) % Model.config.getWidth()).setY((tmp.getY() + 1) % Model.config.getHeight()).build());
+            coord = SnakesProto.GameState.Coord.newBuilder(tmp.setX(1).setY(0).build());
+            snake.addPoints(1, coord.build());
             snake.setHeadDirection(LEFT);
             snake.setPlayerId(id);
             snake.setState(SnakesProto.GameState.Snake.SnakeState.ALIVE);
+            System.out.println(snake.build());
             return snake.build();
         }
     }
-//    public static void placeFood(){
-//        //find empty (not food or snake)
-//        //add to food
-//    }
-//    public static void confirmMoves(){
-//
-//    }
+
     public static void doTurn(){
         ConcurrentHashMap<Integer, SnakesProto.GameState.Coord> new_checks = new ConcurrentHashMap<>();
         ConcurrentHashMap<SnakesProto.GameState.Coord, Integer> used_checks = new ConcurrentHashMap<>();
@@ -176,92 +284,108 @@ public class GameProcess implements Runnable {
         List<SnakesProto.GameState.Snake> snakesList = gameState.getSnakesList();
         Iterator<SnakesProto.GameState.Snake> iter = snakesList.iterator();
         while (iter.hasNext()) {
+            SnakesProto.GameState.Snake snake = iter.next();
             SnakesProto.Direction dir = null;
-            if (steers.containsKey(iter.next().getPlayerId())){
-                dir = steers.get(iter.next().getPlayerId());
+            if (steers.containsKey(snake.getPlayerId())){
+                dir = steers.get(snake.getPlayerId());
             }
-            else dir = iter.next().getHeadDirection();
+            else dir = snake.getHeadDirection();
             SnakesProto.GameState.Coord.Builder newHead = SnakesProto.GameState.Coord.newBuilder();
-            SnakesProto.GameState.Coord head = iter.next().getPoints(0);
+            SnakesProto.GameState.Coord head = snake.getPoints(0);
+            System.out.println("dir = " + dir);
             switch (dir) {
                 case UP: {
                     newHead.setX(head.getX());
-                    newHead.setY((head.getY() - 1) % Model.config.getHeight());
+                    newHead.setY((Model.config.getHeight() + head.getY() - 1) % Model.config.getHeight());
+                    break;
                 }
                 case DOWN: {
                     newHead.setX(head.getX());
-                    newHead.setY((head.getY() + 1) % Model.config.getHeight());
+                    newHead.setY((Model.config.getHeight() + head.getY() + 1) % Model.config.getHeight());
+                    break;
                 }
                 case LEFT: {
-                    newHead.setX((head.getX() - 1) % Model.config.getWidth());
+                    //System.out.println((head.getX() - 1) % Model.config.getWidth());
+                    newHead.setX((Model.config.getWidth() + head.getX() - 1) % Model.config.getWidth());
                     newHead.setY(head.getY());
+                    break;
                 }
                 case RIGHT: {
-                    newHead.setX((head.getX() + 1) % Model.config.getWidth());
+                    newHead.setX((Model.config.getWidth() + head.getX() + 1) % Model.config.getWidth());
                     newHead.setY(head.getY());
+                    break;
                 }
             }
-            new_checks.put(iter.next().getPlayerId(), newHead.build());
-            List<SnakesProto.GameState.Coord> snakeBody = iter.next().getPointsList();
+            //System.out.println(newHead);
+            new_checks.put(snake.getPlayerId(), newHead.build());
+            List<SnakesProto.GameState.Coord> snakeBody = snake.getPointsList();
             int i = 0;
             Iterator<SnakesProto.GameState.Coord> it = snakeBody.iterator();
             SnakesProto.GameState.Coord prev = head;
             SnakesProto.GameState.Coord tail = head;
+            SnakesProto.GameState.Coord.Builder tmp = SnakesProto.GameState.Coord.newBuilder();
             while (it.hasNext()){
+                SnakesProto.GameState.Coord coord = it.next();
                 if (i != 0) {
-                    if (it.next().getX() != 0){
+                    if (coord.getX() != 0){
                         int step;
-                        if (it.next().getX() < 0) {
+                        if (coord.getX() < 0) {
                             step = -1;
                         }
                         else step = 1;
-                        for (int j = prev.getX(); j != it.next().getX(); j = (j + step) % Model.config.getWidth()){
-                            SnakesProto.GameState.Coord.Builder tmp = SnakesProto.GameState.Coord.newBuilder();
-                            tmp.setY(it.next().getY());
+                        for (int j = prev.getX(); j != (Model.config.getWidth() + coord.getX() + prev.getX()) % Model.config.getWidth(); j = (Model.config.getWidth() + j + step) % Model.config.getWidth()){
+                            tmp.setY(prev.getY());
                             tmp.setX(j);
                             tail = tmp.build();
-                            used_checks.put(tmp.build(), iter.next().getPlayerId());
-                            if (it.next().getY() == (j + step) % Model.config.getWidth()){
-                                tmp.setX(it.next().getX());
-                                tmp.setY(it.next().getY());
-                                tmp.build();
-                                tail = tmp.build();
-                                used_checks.put(tmp.build(), iter.next().getPlayerId());
-                            }
+                            used_checks.put(tmp.build(), snake.getPlayerId());
+//                            if (coord.getY() == (j + step) % Model.config.getWidth()){
+//                                tmp.setX(coord.getX());
+//                                tmp.setY(coord.getY());
+//                                tmp.build();
+//                                tail = tmp.build();
+//                                used_checks.put(tmp.build(), snake.getPlayerId());
+//                            }
                         }
+                        tmp.setX((Model.config.getWidth() + coord.getX() + prev.getX()) % Model.config.getWidth());
+                        tail = tmp.build();
+                        used_checks.put(tail, snake.getPlayerId());
                     }
                     else { //y!=0
                         int step;
-                        if (it.next().getY() < 0) {
+                        if (coord.getY() < 0) {
                             step = -1;
                         }
                         else step = 1;
-                        for (int j = prev.getY(); j != it.next().getY(); j = (j + step) % Model.config.getHeight()){
-                            SnakesProto.GameState.Coord.Builder tmp = SnakesProto.GameState.Coord.newBuilder();
-                            tmp.setX(it.next().getX());
+                        for (int j = prev.getY(); j != (Model.config.getHeight() + coord.getY() + prev.getY()) % Model.config.getHeight(); j = (Model.config.getHeight() + j + step) % Model.config.getHeight()){
+                            tmp.setX(prev.getX());
                             tmp.setY(j);
-                            tmp.build();
+                            //tmp.build();
                             tail = tmp.build();
-                            used_checks.put(tmp.build(), iter.next().getPlayerId());
-                            if (it.next().getY() == (j + step) % Model.config.getHeight()){
-                                tmp.setX(it.next().getX());
-                                tmp.setY(it.next().getY());
-                                tmp.build();
-                                tail = tmp.build();
-                                used_checks.put(tmp.build(), iter.next().getPlayerId());
-                            }
+                            used_checks.put(tmp.build(), snake.getPlayerId());
+//                            if (coord.getY() == (j + step) % Model.config.getHeight()){
+//                                tmp.setX(coord.getX());
+//                                tmp.setY(coord.getY());
+//                                tmp.build();
+//                                tail = tmp.build();
+//                                used_checks.put(tmp.build(), snake.getPlayerId());
+//                            }
                         }
+                        tmp.setY((Model.config.getHeight() + coord.getY() + prev.getY()) % Model.config.getHeight());
+                        tail = tmp.build();
+                        used_checks.put(tail, snake.getPlayerId());
                     }
-                    prev = it.next();
+                    prev = tmp.build();
                 }
                 i++;
             }
             if (!gameState.getFoodsList().contains(newHead.build())) {
-                used_checks.remove(tail, iter.next().getPlayerId());
+                used_checks.remove(tail, snake.getPlayerId());
             }
             else {
                 gameState.getFoodsList().remove(newHead.build());
-                addPoint(iter.next().getPlayerId());
+                if (snake.getState() != SnakesProto.GameState.Snake.SnakeState.ZOMBIE) {
+                    addPoint(snake.getPlayerId());
+                }
             }
         }
         Iterator<SnakesProto.GameState.Snake> it = snakesList.iterator();
@@ -279,17 +403,26 @@ public class GameProcess implements Runnable {
         }
         Iterator<Integer> dead = dead_players.iterator();
         while(dead.hasNext()){
+            int deadid = dead.next();
             //gameState.getSnakesList().remove(gameState.getSnakes(dead.next()));
-            Model.becomeViewer(dead.next());
+            if (deadid >= 0) Model.makeViewer(deadid);
         }
         snakesList = gameState.getSnakesList();
+        //List<SnakesProto.GameState.Snake.Builder> snakesListnew = new ArrayList<>();
         Iterator<SnakesProto.GameState.Snake> snakeIterator= snakesList.iterator();
+        int i = 0;
         //confirm moves of active snakes
         while(snakeIterator.hasNext()){
-            List<SnakesProto.GameState.Coord>coordList = snakeIterator.next().getPointsList();
+            SnakesProto.GameState.Snake snake = snakeIterator.next();
+
+            SnakesProto.GameState.Snake.Builder newsnake = SnakesProto.GameState.Snake.newBuilder(snake);
+           // snakesListnew.add(newsnake);
+            System.out.println(newsnake);
+            List<SnakesProto.GameState.Coord>coordList = newsnake.getPointsList();
             SnakesProto.GameState.Coord tail = coordList.get(coordList.size() - 1);
             SnakesProto.GameState.Coord head = coordList.get(0);
-            SnakesProto.GameState.Coord newHead = new_checks.get(snakeIterator.next().getPlayerId());
+            SnakesProto.GameState.Coord newHead = new_checks.get(newsnake.getPlayerId());
+            System.out.println(newHead);
             SnakesProto.GameState.Coord head_next = coordList.get(1);
             int step = 1;
             if (tail.getX() != 0) {
@@ -298,10 +431,12 @@ public class GameProcess implements Runnable {
                 tmp.setY(tail.getY());
                 tmp.setX(step * (abs(tail.getX()) - 1));
                 if (tmp.getX() == 0) {
-                    snakeIterator.next().getPointsList().remove(coordList.size() - 1);
+                    //snake.getPointsList().remove(coordList.size() - 1);
+                    newsnake.removePoints(coordList.size() - 1);
                 }
                 else {
-                    snakeIterator.next().getPointsList().add(coordList.size() - 1, tmp.build());
+                    //snake.getPointsList().add(coordList.size() - 1, tmp.build());
+                    newsnake.setPoints(coordList.size() - 1, tmp.build()); //was add
                 }
             }
             else { //getY != 0
@@ -310,37 +445,65 @@ public class GameProcess implements Runnable {
                 tmp.setX(tail.getX());
                 tmp.setY(step * (abs(tail.getY()) - 1));
                 if (tmp.getY() == 0) {
-                    snakeIterator.next().getPointsList().remove(coordList.size() - 1);
+                    //snake.getPointsList().remove(coordList.size() - 1);
+                    newsnake.removePoints(coordList.size() - 1);
                 }
                 else {
-                    snakeIterator.next().getPointsList().add(coordList.size() - 1, tmp.build());
+                    //snake.getPointsList().add(coordList.size() - 1, tmp.build());
+                    newsnake.setPoints(coordList.size() - 1, tmp.build()); //was add
                 }
             }
             SnakesProto.GameState.Coord.Builder tmp1 = SnakesProto.GameState.Coord.newBuilder();
             if (newHead.getX() == head.getX() && head_next.getX() == 0){
                 //in 1 vert line
-                tmp1.setY((head_next.getY() / abs(head_next.getY())) * (abs(head_next.getY() + 1)));
-                tmp1.setX(newHead.getX());
-                snakeIterator.next().getPointsList().set(0, newHead);
-                snakeIterator.next().getPointsList().set(1, tmp1.build());
+                tmp1.setX(0);
+                //snake.getPointsList().set(0, newHead);
+                newsnake.setPoints(0, newHead);
+                //snake.getPointsList().set(1, tmp1.build());
+                if (newsnake.getPointsList().size() > 2) {
+                    tmp1.setY((head_next.getY() / abs(head_next.getY())) * (abs(head_next.getY()) + 1));
+                    newsnake.setPoints(1, tmp1.build());
+                }
+                else {
+                    tmp1.setY((head_next.getY() / abs(head_next.getY())) * (abs(head_next.getY())));
+                    if (newsnake.getPointsList().size() > 1) newsnake.setPoints(1, tmp1.build());
+                    else newsnake.addPoints(1, tmp1.build());
+                }
             }
             else {
                 if (newHead.getY() == head.getY() && head_next.getY() == 0){
                     //in 1 hor line
-                    tmp1.setY((head_next.getX() / abs(head_next.getX())) * (abs(head_next.getX() + 1)));
-                    tmp1.setX(newHead.getY());
-                    snakeIterator.next().getPointsList().set(0, newHead);
-                    snakeIterator.next().getPointsList().set(1, tmp1.build());
+                    tmp1.setY(0);
+                    //snake.getPointsList().set(0, newHead);
+                    newsnake.setPoints(0, newHead);
+                    //snake.getPointsList().set(1, tmp1.build());
+                    //System.out.println(newsnake.build());
+                    if (newsnake.getPointsList().size() > 2) {
+                        tmp1.setX((head_next.getX() / abs(head_next.getX())) * (abs(head_next.getX()) + 1));
+                        newsnake.setPoints(1, tmp1.build());
+                    }
+                    else {
+                        tmp1.setX((head_next.getX() / abs(head_next.getX())) * (abs(head_next.getX())));
+                        if (newsnake.getPointsList().size() > 1) newsnake.setPoints(1, tmp1.build());
+                        else newsnake.addPoints(1, tmp1.build());
+                    }
+                    System.out.println(newsnake.build());
                 }
                 else {
                     //head is corner of snake
                     tmp1.setY(head.getY() - newHead.getY());
                     tmp1.setX(head.getX() - newHead.getX());
-                    snakeIterator.next().getPointsList().set(0, tmp1.build());
-                    snakeIterator.next().getPointsList().add(0, newHead);
+                    //snake.getPointsList().set(0, tmp1.build());
+                    newsnake.setPoints(0, tmp1.build());
+                    //snake.getPointsList().add(0, newHead);
+                    newsnake.addPoints(0, newHead);
                 }
             }
+
+            gameState.setSnakes(i, newsnake.build());
+            i++;
         }
+
         //add food
         //aliveSnakes = snake.size - dead.size
         float foodMax = Model.config.getFoodStatic() + aliveSnakes * Model.config.getFoodPerPlayer();
@@ -352,7 +515,7 @@ public class GameProcess implements Runnable {
             if (dead_players.contains(pair.getValue())) {
                 int spawn_chance = rnd.nextInt(100);
                 if (Model.config.getDeadFoodProb() < spawn_chance) {
-                    gameState.getFoodsList().add(it1.next().getKey());
+                    gameState.getFoodsList().add(pair.getKey());
                 }
             }
         }
@@ -371,7 +534,10 @@ public class GameProcess implements Runnable {
             }
             if (new_checks.contains(tmp.build())) continue; //point where is (or not) a snake
             //solution: add all relevant to used_check and check only used_check
-            gameState.getFoodsList().add(tmp.build());
+            gameState.addFoods(tmp.build());
+//            SnakesProto.GamePlayers.Builder pls = SnakesProto.GamePlayers.newBuilder();
+//            pls.addPlayers(p);
+//            gameState.setPlayers(pls);
         }
 
         //mb update stats
