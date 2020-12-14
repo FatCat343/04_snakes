@@ -9,34 +9,43 @@ import java.net.InetAddress;
 import java.net.MulticastSocket;
 import java.sql.Time;
 import java.time.LocalTime;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static java.time.temporal.ChronoUnit.SECONDS;
 
 public class GameListReceiver implements Runnable {
-    MulticastSocket socket;
-    public static ConcurrentHashMap<GameListMessage, LocalTime> table = new ConcurrentHashMap<>();
-    public static void StartClient(MulticastSocket socket){
-        Thread t = new Thread(new GameListReceiver(socket));
+    public static MulticastSocket socket;
+    public static ConcurrentHashMap<Sender, SnakesProto.GameMessage.AnnouncementMsg> table = new ConcurrentHashMap<>();
+    public static ConcurrentHashMap<Sender, LocalTime> clients = new ConcurrentHashMap<>();
+    public static void start(){
+        Thread t = new Thread(new GameListReceiver());
         t.start();
     }
-    GameListReceiver(MulticastSocket s){
-        socket = s;
-    }
-    public void UpdateTable(GameListMessage msg){
-        if (table.containsKey(msg)) table.replace(msg, LocalTime.now());
-        else table.put(msg, LocalTime.now());
-        Iterator<Map.Entry<GameListMessage, LocalTime>> it = table.entrySet().iterator();
+    GameListReceiver(){}
+    public void UpdateTable(SnakesProto.GameMessage.AnnouncementMsg msg, Sender sender){
+        //String senderstring = sender.ip + " " + sender.port;
+        if (clients.containsKey(sender)) {
+            //System.out.println("replace, amount = " + clients.size());
+            clients.replace(sender, LocalTime.now());
+            table.replace(sender, msg);
+        }
+        else {
+            //System.out.println("put, amount = " + clients.size());
+            clients.put(sender, LocalTime.now());
+            table.put(sender, msg);
+        }
+        Iterator<Map.Entry<Sender, LocalTime>> it = clients.entrySet().iterator();
         while(it.hasNext()){
             //System.out.println("1");
-            Map.Entry<GameListMessage, LocalTime> pair = it.next();
+            Map.Entry<Sender, LocalTime> pair = it.next();
             //System.out.println(pair.getKey());
-            if (pair.getValue().plusNanos(Model.config.getNodeTimeoutMs() * 1000000).isBefore(LocalTime.now())) { //timeout
+            if (pair.getValue().plusSeconds(2).isBefore(LocalTime.now())) { //timeout
                 //System.out.println(pair.getKey() + "  " + pair.getValue() + "   " + LocalTime.now());
+                Sender key = pair.getKey();
+
+                System.out.println("remove " + key.port + "  " + key.ip);
+                table.remove(key);
                 it.remove();
             }
         }
@@ -46,41 +55,38 @@ public class GameListReceiver implements Runnable {
         InetAddress group = InetAddress.getByName(ip);
         socket.joinGroup(group);
         while (true) {
-            //System.out.println("Waiting for multicast message...");
             Sender sender = new Sender();
             byte[] recvBuf = new byte[64000];
             DatagramPacket packet = new DatagramPacket(recvBuf, recvBuf.length);
 
             socket.receive(packet);
-            sender.ip = packet.getAddress().toString();
-            sender.port = packet.getPort();
-            //int byteCount = packet.getLength();
-//            ByteArrayInputStream byteStream = new ByteArrayInputStream(recvBuf);
-//            ObjectInputStream is = new ObjectInputStream(new BufferedInputStream(byteStream));
-//            try {
-//                Object o = is.readObject();
-//            } catch (ClassNotFoundException e) {
-//                e.printStackTrace();
-//            }
-//            is.close();
-            //recvBuf = packet.getData();
-            //System.out.println();
+
+            //System.out.println("received from ip = " + sender.ip + " port = ");
+
+            //sender.port = packet.getPort();
             SnakesProto.GameMessage msg = SnakesProto.GameMessage.parseFrom(Arrays.copyOf(packet.getData(), packet.getLength()));
-
-            GameListMessage message = new GameListMessage();
-            message.sender = sender;
-            message.announce = msg.getAnnouncement();
-
-            //System.out.println("[Multicast UDP message received] >> " + msg.toString());
-            UpdateTable(message);
-            //System.out.println("copies launched : " + table.size());
-            //GUI.repaintGameList(table);
+            List<SnakesProto.GamePlayer> players = msg.getAnnouncement().getPlayers().getPlayersList();
+            Iterator<SnakesProto.GamePlayer> iter = players.iterator();
+            int j = 0;
+            while (iter.hasNext()){
+                if (iter.next().getRole().equals(SnakesProto.NodeRole.MASTER)) break;
+                else j++;
+            }
+            sender.ip = packet.getAddress().toString().split("/")[1];
+            sender.port = msg.getAnnouncement().getPlayers().getPlayers(j).getPort();
+            System.out.println("received packet from ip = " + sender.ip + "  port = " + sender.port);
+            //GameListMessage message = new GameListMessage();
+            //message.sender = sender;
+            //message.announce = msg.getAnnouncement();
+            UpdateTable(msg.getAnnouncement(), sender);
+            System.out.println("servers available: "+clients.size() + "  table size = " + table.size());
         }
     }
 
     @Override
     public void run() {
-        try {
+        try (MulticastSocket sock = new MulticastSocket(9192);){
+            socket = sock;
             receiveUDPMessage("239.192.0.4", 9192);
         } catch (IOException ex) {
             ex.printStackTrace();

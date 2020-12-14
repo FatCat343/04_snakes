@@ -10,6 +10,7 @@ import java.time.LocalTime;
 import static java.lang.Thread.sleep;
 
 public class GameListSender implements Runnable {
+    public static MulticastSocket socket;
     public static void start(){
         Thread t = new Thread(new GameListSender());
         t.start();
@@ -29,8 +30,9 @@ public class GameListSender implements Runnable {
     }
 
     public void run() {
-        try (MulticastSocket socket = new MulticastSocket(9192);){
-            GameListReceiver.StartClient(socket);
+        try {
+            socket = GameListReceiver.socket;
+            //GameListReceiver.StartClient(socket);
             SnakesProto.GameMessage.Builder msg = SnakesProto.GameMessage.newBuilder();
             SnakesProto.GameMessage.AnnouncementMsg.Builder ann = SnakesProto.GameMessage.AnnouncementMsg.newBuilder();
             ann.setConfig(Model.config);

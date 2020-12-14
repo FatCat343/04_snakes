@@ -20,6 +20,9 @@ public class GameProcess implements Runnable {
         gameState.setConfig(Model.config);
         gameState.setStateOrder(getStateOrder());
         Controller.playerId = 0;
+        Controller.masterId = 0;
+        Controller.role = SnakesProto.NodeRole.MASTER;
+        aliveSnakes = 0;
         SnakesProto.GameState.Snake res = findPlace(0);
         if (res != null) {
             //can be added, snake already placed + configured (or not)
@@ -29,7 +32,7 @@ public class GameProcess implements Runnable {
             p.setName(Controller.name);
             p.setIpAddress("1.1.1.1");
             p.setPort(Controller.port);
-            p.setRole(SnakesProto.NodeRole.NORMAL);
+            p.setRole(SnakesProto.NodeRole.MASTER);
             p.setScore(0);
 
             //gameState.getPlayers().getPlayersList().add(p.build());
@@ -72,11 +75,20 @@ public class GameProcess implements Runnable {
     }
     public static void start() {
         Thread t = new Thread(new GameProcess());
+        //aliveSnakes = 1;
         running = true;
         t.start();
     }
     public static void continueGame(SnakesProto.GameState state){
         Thread t = new Thread(new GameProcess(state));
+        int count = 0;
+        List<SnakesProto.GamePlayer> playerList = state.getPlayers().getPlayersList();
+        for (int i = 0; i < playerList.size(); i++) {
+            if (!playerList.get(i).getRole().equals(SnakesProto.NodeRole.VIEWER)) {
+                count++;
+            }
+        }
+        aliveSnakes = count;
         running = true;
         t.start();
     }
@@ -87,7 +99,10 @@ public class GameProcess implements Runnable {
             if (playerList.get(i).getId() == id) {
                 SnakesProto.GamePlayer.Builder player = SnakesProto.GamePlayer.newBuilder(playerList.get(i));
                 player.setRole(role);
-                playerList.set(i, player.build());
+                SnakesProto.GamePlayers.Builder players = SnakesProto.GamePlayers.newBuilder(gameState.getPlayers());
+                players.setPlayers(i, player.build());
+                //playerList.set(i, player.build());
+                gameState.setPlayers(players);
                 break;
             }
         }
@@ -101,10 +116,22 @@ public class GameProcess implements Runnable {
             SnakesProto.GameState.Snake snake = iter.next();
             if (snake.getPlayerId() == id) {
                 switch (snake.getHeadDirection()) {
-                    case UP: if (!dir.equals(DOWN)) steers.put(id, dir);
-                    case DOWN: if (!dir.equals(UP)) steers.put(id, dir);
-                    case LEFT: if (!dir.equals(RIGHT)) steers.put(id, dir);
-                    case RIGHT: if (!dir.equals(LEFT)) steers.put(id, dir);
+                    case UP: {
+                        if (!dir.equals(DOWN)) steers.put(id, dir);
+                        break;
+                    }
+                    case DOWN: {
+                        if (!dir.equals(UP)) steers.put(id, dir);
+                        break;
+                    }
+                    case LEFT: {
+                        if (!dir.equals(RIGHT)) steers.put(id, dir);
+                        break;
+                    }
+                    case RIGHT: {
+                        if (!dir.equals(LEFT)) steers.put(id, dir);
+                        break;
+                    }
                 }
                 break;
             }
@@ -279,20 +306,21 @@ public class GameProcess implements Runnable {
     public static void doTurn(){
         ConcurrentHashMap<Integer, SnakesProto.GameState.Coord> new_checks = new ConcurrentHashMap<>();
         ConcurrentHashMap<SnakesProto.GameState.Coord, Integer> used_checks = new ConcurrentHashMap<>();
+        List<Integer> food_eaters = new ArrayList<>();
         List<Integer> dead_players = new ArrayList<>();
         //TODO: sync iteration
         List<SnakesProto.GameState.Snake> snakesList = gameState.getSnakesList();
         Iterator<SnakesProto.GameState.Snake> iter = snakesList.iterator();
+        SnakesProto.Direction dir = null;
         while (iter.hasNext()) {
             SnakesProto.GameState.Snake snake = iter.next();
-            SnakesProto.Direction dir = null;
             if (steers.containsKey(snake.getPlayerId())){
                 dir = steers.get(snake.getPlayerId());
             }
             else dir = snake.getHeadDirection();
             SnakesProto.GameState.Coord.Builder newHead = SnakesProto.GameState.Coord.newBuilder();
             SnakesProto.GameState.Coord head = snake.getPoints(0);
-            System.out.println("dir = " + dir);
+            //System.out.println("dir = " + dir);
             switch (dir) {
                 case UP: {
                     newHead.setX(head.getX());
@@ -382,10 +410,17 @@ public class GameProcess implements Runnable {
                 used_checks.remove(tail, snake.getPlayerId());
             }
             else {
-                gameState.getFoodsList().remove(newHead.build());
+                //gameState.removeFoods(gameState.getFoodsList().newHead.build());
+                int t = 0;
+                for (SnakesProto.GameState.Coord coord : gameState.getFoodsList()) {
+                    if (coord.equals(newHead.build())) break;
+                    else t++;
+                }
+                gameState.removeFoods(t);
                 if (snake.getState() != SnakesProto.GameState.Snake.SnakeState.ZOMBIE) {
                     addPoint(snake.getPlayerId());
                 }
+                food_eaters.add(snake.getPlayerId());
             }
         }
         Iterator<SnakesProto.GameState.Snake> it = snakesList.iterator();
@@ -395,6 +430,7 @@ public class GameProcess implements Runnable {
             new_checks.remove(snake.getPlayerId());
             if ((new_checks.containsValue(p_check)) || (used_checks.containsKey(p_check))) {
                 dead_players.add(snake.getPlayerId());
+                System.out.println("snake dead");
                 if (used_checks.containsKey(p_check)) {
                     addPoint(used_checks.get(p_check));
                 }
@@ -405,6 +441,7 @@ public class GameProcess implements Runnable {
         while(dead.hasNext()){
             int deadid = dead.next();
             //gameState.getSnakesList().remove(gameState.getSnakes(dead.next()));
+            deleteSnake(deadid);
             if (deadid >= 0) Model.makeViewer(deadid);
         }
         snakesList = gameState.getSnakesList();
@@ -425,34 +462,35 @@ public class GameProcess implements Runnable {
             System.out.println(newHead);
             SnakesProto.GameState.Coord head_next = coordList.get(1);
             int step = 1;
-            if (tail.getX() != 0) {
-                if (tail.getX() < 0) step = -1;
-                SnakesProto.GameState.Coord.Builder tmp = SnakesProto.GameState.Coord.newBuilder();
-                tmp.setY(tail.getY());
-                tmp.setX(step * (abs(tail.getX()) - 1));
-                if (tmp.getX() == 0) {
-                    //snake.getPointsList().remove(coordList.size() - 1);
-                    newsnake.removePoints(coordList.size() - 1);
-                }
-                else {
-                    //snake.getPointsList().add(coordList.size() - 1, tmp.build());
-                    newsnake.setPoints(coordList.size() - 1, tmp.build()); //was add
+            if (!food_eaters.contains(snake.getPlayerId())) {
+                if (tail.getX() != 0) {
+                    if (tail.getX() < 0) step = -1;
+                    SnakesProto.GameState.Coord.Builder tmp = SnakesProto.GameState.Coord.newBuilder();
+                    tmp.setY(tail.getY());
+                    tmp.setX(step * (abs(tail.getX()) - 1));
+                    if (tmp.getX() == 0) {
+                        //snake.getPointsList().remove(coordList.size() - 1);
+                        newsnake.removePoints(coordList.size() - 1);
+                    } else {
+                        //snake.getPointsList().add(coordList.size() - 1, tmp.build());
+                        newsnake.setPoints(coordList.size() - 1, tmp.build()); //was add
+                    }
+                } else { //getY != 0
+                    if (tail.getY() < 0) step = -1;
+                    SnakesProto.GameState.Coord.Builder tmp = SnakesProto.GameState.Coord.newBuilder();
+                    tmp.setX(tail.getX());
+                    tmp.setY(step * (abs(tail.getY()) - 1));
+                    if (tmp.getY() == 0) {
+                        //snake.getPointsList().remove(coordList.size() - 1);
+                        newsnake.removePoints(coordList.size() - 1);
+                    } else {
+                        //snake.getPointsList().add(coordList.size() - 1, tmp.build());
+                        newsnake.setPoints(coordList.size() - 1, tmp.build()); //was add
+                    }
                 }
             }
-            else { //getY != 0
-                if (tail.getY() < 0) step = -1;
-                SnakesProto.GameState.Coord.Builder tmp = SnakesProto.GameState.Coord.newBuilder();
-                tmp.setX(tail.getX());
-                tmp.setY(step * (abs(tail.getY()) - 1));
-                if (tmp.getY() == 0) {
-                    //snake.getPointsList().remove(coordList.size() - 1);
-                    newsnake.removePoints(coordList.size() - 1);
-                }
-                else {
-                    //snake.getPointsList().add(coordList.size() - 1, tmp.build());
-                    newsnake.setPoints(coordList.size() - 1, tmp.build()); //was add
-                }
-            }
+            //System.out.println("snake after deleting tale");
+            //System.out.println(newsnake);
             SnakesProto.GameState.Coord.Builder tmp1 = SnakesProto.GameState.Coord.newBuilder();
             if (newHead.getX() == head.getX() && head_next.getX() == 0){
                 //in 1 vert line
@@ -460,14 +498,16 @@ public class GameProcess implements Runnable {
                 //snake.getPointsList().set(0, newHead);
                 newsnake.setPoints(0, newHead);
                 //snake.getPointsList().set(1, tmp1.build());
-                if (newsnake.getPointsList().size() > 2) {
+                if (newsnake.getPointsList().size() > 1) {
+                    head_next = newsnake.getPoints(1);
                     tmp1.setY((head_next.getY() / abs(head_next.getY())) * (abs(head_next.getY()) + 1));
                     newsnake.setPoints(1, tmp1.build());
                 }
                 else {
-                    tmp1.setY((head_next.getY() / abs(head_next.getY())) * (abs(head_next.getY())));
-                    if (newsnake.getPointsList().size() > 1) newsnake.setPoints(1, tmp1.build());
-                    else newsnake.addPoints(1, tmp1.build());
+                    tmp1.setY(head_next.getY());
+                    //if (newsnake.getPointsList().size() > 1) newsnake.setPoints(1, tmp1.build());
+                    //else newsnake.addPoints(1, tmp1.build());
+                    newsnake.addPoints(1, tmp1.build());
                 }
             }
             else {
@@ -478,16 +518,17 @@ public class GameProcess implements Runnable {
                     newsnake.setPoints(0, newHead);
                     //snake.getPointsList().set(1, tmp1.build());
                     //System.out.println(newsnake.build());
-                    if (newsnake.getPointsList().size() > 2) {
+                    if (newsnake.getPointsList().size() > 1) {
+                        head_next = newsnake.getPoints(1);
                         tmp1.setX((head_next.getX() / abs(head_next.getX())) * (abs(head_next.getX()) + 1));
                         newsnake.setPoints(1, tmp1.build());
                     }
                     else {
-                        tmp1.setX((head_next.getX() / abs(head_next.getX())) * (abs(head_next.getX())));
-                        if (newsnake.getPointsList().size() > 1) newsnake.setPoints(1, tmp1.build());
-                        else newsnake.addPoints(1, tmp1.build());
+                        tmp1.setX(head_next.getX());
+                        //if (newsnake.getPointsList().size() > 1) newsnake.setPoints(1, tmp1.build());
+                        newsnake.addPoints(1, tmp1.build());
                     }
-                    System.out.println(newsnake.build());
+                    //System.out.println(newsnake.build());
                 }
                 else {
                     //head is corner of snake
@@ -499,7 +540,7 @@ public class GameProcess implements Runnable {
                     newsnake.addPoints(0, newHead);
                 }
             }
-
+            newsnake.setHeadDirection(dir);
             gameState.setSnakes(i, newsnake.build());
             i++;
         }
@@ -549,7 +590,11 @@ public class GameProcess implements Runnable {
             if (playerList.get(i).getId() == playerId) {
                 SnakesProto.GamePlayer.Builder player = SnakesProto.GamePlayer.newBuilder(playerList.get(i));
                 player.setScore(player.getScore() + 1);
-                playerList.set(i, player.build());
+                SnakesProto.GamePlayers.Builder players = SnakesProto.GamePlayers.newBuilder(gameState.getPlayers());
+                players.setPlayers(i, player.build());
+                gameState.setPlayers(players.build());
+
+                //playerList.set(i, player.build());
                 break;
             }
         }
@@ -571,5 +616,19 @@ public class GameProcess implements Runnable {
         }
         return id;
     }
-
+    private static void deleteSnake(int id){
+        List<SnakesProto.GameState.Snake> snakeList = gameState.getSnakesList();
+        for (int i = 0; i < snakeList.size(); i++) {
+            if (snakeList.get(i).getPlayerId() == id) {
+                //SnakesProto.GamePlayer.Builder player = SnakesProto.GamePlayer.newBuilder(playerList.get(i));
+                //player.setScore(player.getScore() + 1);
+                //SnakesProto.GamePlayers.Builder players = SnakesProto.GamePlayers.newBuilder(gameState.getPlayers());
+                //players.setPlayers(i, player.build());
+                //gameState.setPlayers(players.build());
+                gameState.removeSnakes(i);
+                //playerList.set(i, player.build());
+                break;
+            }
+        }
+    }
 }

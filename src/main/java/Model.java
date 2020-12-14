@@ -23,7 +23,10 @@ public class Model {
         try {
             socket = new DatagramSocket(Controller.port);
             parse("config.txt");
+            GameListReceiver.start();
+            ///
             GUI.init(config); //set params in init
+            GameProcess.start();
         } catch (SocketException e) {
             e.printStackTrace();
         }
@@ -35,6 +38,7 @@ public class Model {
 
 
     public static void StartNew(){
+        exit();
         GameProcess.start();
         Controller.playerId = 0;
         Controller.masterId = 0;
@@ -49,7 +53,8 @@ public class Model {
 
     public static void parse(String filename){ //parse config file to get params
         SnakesProto.GameConfig.Builder tmp = SnakesProto.GameConfig.newBuilder();
-
+        //tmp.setHeight(7);
+        //tmp.setWidth(7);
 
         config = tmp.build();
     }
@@ -96,6 +101,11 @@ public class Model {
         GameProcess.newPlayer(gm, sender);
 
     }
+//    public static void deleteSnake(int id){
+//        //player needs become viewer
+//
+//        //GameProcess.aliveSnakes--;
+//    }
     public static void error(SnakesProto.GameMessage gm, SnakesProto.GamePlayer player){
         //exit();
         GUI.error(gm.getError().getErrorMessage());
@@ -233,9 +243,9 @@ public class Model {
         }
         else {
             //we become viewer
-            Controller.role = SnakesProto.NodeRole.VIEWER;
-            GameProcess.changeState(id, VIEWER);
-            GameProcess.makeZombie(id);
+            //Controller.role = SnakesProto.NodeRole.VIEWER;
+            //GameProcess.changeState(id, VIEWER);
+            //GameProcess.makeZombie(id);
         }
         //GameProcess.aliveSnakes--;
 

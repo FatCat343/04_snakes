@@ -133,8 +133,9 @@ public class Controller {
         //TODO: sync iteration
         Iterator<SnakesProto.GamePlayer> iter = Model.state.getPlayers().getPlayersList().iterator();
         while (iter.hasNext()) {
-            if (iter.next().getId() == searchId) {
-                return iter.next().getRole();
+            SnakesProto.GamePlayer player = iter.next();
+            if (player.getId() == searchId) {
+                return player.getRole();
             }
         }
         return null;
@@ -143,8 +144,9 @@ public class Controller {
         //TODO: sync iteration
         Iterator<SnakesProto.GamePlayer> iter = Model.state.getPlayers().getPlayersList().iterator();
         while (iter.hasNext()) {
-            if ((iter.next().getIpAddress().equals(sender.ip)) && (iter.next().getPort() == sender.port)) {
-                return iter.next().getId();
+            SnakesProto.GamePlayer player = iter.next();
+            if ((player.getIpAddress().equals(sender.ip)) && (player.getPort() == sender.port)) {
+                return player.getId();
             }
         }
         return -1;
@@ -153,8 +155,9 @@ public class Controller {
         //TODO: make synchronized iteration
         Iterator<SnakesProto.GamePlayer> iter = Model.state.getPlayers().getPlayersList().iterator();
         while (iter.hasNext()) {
-            if ((iter.next().getIpAddress().equals(sender.ip)) && (iter.next().getPort() == sender.port)) {
-                return iter.next();
+            SnakesProto.GamePlayer player = iter.next();
+            if ((player.getIpAddress().equals(sender.ip)) && (player.getPort() == sender.port)) {
+                return player;
             }
         }
         return null;
@@ -163,8 +166,9 @@ public class Controller {
         //TODO: make synchronized iteration
         Iterator<SnakesProto.GamePlayer> iter = Model.state.getPlayers().getPlayersList().iterator();
         while (iter.hasNext()) {
-            if (iter.next().getId() == searchId) {
-                return iter.next();
+            SnakesProto.GamePlayer player = iter.next();
+            if (player.getId() == searchId) {
+                return player;
             }
         }
         return null;
@@ -173,8 +177,9 @@ public class Controller {
         //find deputy, change info about master to deputy
         Iterator<SnakesProto.GamePlayer> iter = Model.state.getPlayers().getPlayersList().iterator();
         while (iter.hasNext()) {
-            if (iter.next().getRole().equals(SnakesProto.NodeRole.DEPUTY)) {
-                masterId = iter.next().getId();
+            SnakesProto.GamePlayer player = iter.next();
+            if (player.getRole().equals(SnakesProto.NodeRole.DEPUTY)) {
+                masterId = player.getId();
             }
         }
     }
@@ -182,8 +187,9 @@ public class Controller {
         //find new deputy in players map
         Iterator<SnakesProto.GamePlayer> iter = Model.state.getPlayers().getPlayersList().iterator();
         while (iter.hasNext()) {
-            if (iter.next().getRole().equals(SnakesProto.NodeRole.NORMAL)) {
-                Model.setDeputy(iter.next().getId());
+            SnakesProto.GamePlayer player = iter.next();
+            if (player.getRole().equals(SnakesProto.NodeRole.NORMAL)) {
+                Model.setDeputy(player.getId());
                 break;
             }
         }
@@ -192,8 +198,9 @@ public class Controller {
         //int id = -1;
         Iterator<SnakesProto.GamePlayer> iter = Model.state.getPlayers().getPlayersList().iterator();
         while (iter.hasNext()) {
-            if (iter.next().getRole().equals(role)) {
-                return iter.next().getId();
+            SnakesProto.GamePlayer player = iter.next();
+            if (player.getRole().equals(role)) {
+                return player.getId();
             }
         }
         return -1;

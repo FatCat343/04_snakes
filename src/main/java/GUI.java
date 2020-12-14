@@ -18,6 +18,9 @@ class ConnectListener implements ActionListener{
     private final Sender sender;
     ConnectListener(Sender s){
         sender = s;
+        //sender = new Sender();
+//        sender.ip = ip;
+//        sender.port = port;
     }
     @Override
     public void actionPerformed(ActionEvent e) {
@@ -85,11 +88,11 @@ public class GUI {
 //        CreateSpecs(Model.config);
 //        CreateButtons();
 //    }
-    public static void repaint(SnakesProto.GameState state, ConcurrentHashMap<GameListMessage, LocalTime> table){
-        System.out.println(state);
+    public static void repaint(SnakesProto.GameState state, ConcurrentHashMap<Sender, SnakesProto.GameMessage.AnnouncementMsg> table){
+        //System.out.println(state);
         ox = state.getConfig().getWidth();
         oy = state.getConfig().getHeight();
-        RepaintField(state.getSnakesList());
+        RepaintField(state.getSnakesList(), state.getFoodsList());
         repaintGameList(table); //another method
         RepaintScores(state.getPlayers().getPlayersList());
         RepaintSpecs(state.getConfig());
@@ -142,8 +145,8 @@ public class GUI {
         gamelistinfo = new JTable(data, columnNames);
         gamelistinfo.setRowHeight(20);
         JScrollPane scrollPane = new JScrollPane(gamelistinfo);
-        scrollPane.setPreferredSize(new Dimension((int)(ox*checksize*0.4), (int)(oy*checksize*0.5)));
-        toolbar.setPreferredSize(new Dimension((int)(ox*checksize*0.4), (int)(oy*checksize*0.5)));
+        scrollPane.setPreferredSize(new Dimension((int)(30*checksize*0.4), (int)(30*checksize*0.5)));
+        toolbar.setPreferredSize(new Dimension((int)(30*checksize*0.4), (int)(30*checksize*0.5)));
         gameList.add(scrollPane, BorderLayout.CENTER);
         gameList.add(toolbar);
         rightSide.add(gameList, BorderLayout.SOUTH);
@@ -161,6 +164,7 @@ public class GUI {
                 {"node_timeout_ms", "", ""},
         };
         String s = "";
+        //System.out.println("conf width = " + config.getWidth());
         data[0][1] = Integer.toString(config.getWidth());
         data[1][1] = Integer.toString(config.getHeight());
         data[2][1] = Integer.toString(config.getFoodStatic());
@@ -171,7 +175,7 @@ public class GUI {
         data[7][1] = Integer.toString(config.getNodeTimeoutMs());
         gameSpecs = new JTable(data, columnNames);
         JScrollPane scrollPane = new JScrollPane(gameSpecs);
-        scrollPane.setPreferredSize(new Dimension((int)(ox*checksize*0.4), (int)(oy*checksize*0.4)));
+        scrollPane.setPreferredSize(new Dimension((int)(30*checksize*0.4), (int)(30*checksize*0.4)));
         tables.add(scrollPane, BorderLayout.LINE_END);
     }
     private static void CreateScores() {
@@ -179,7 +183,7 @@ public class GUI {
         String[][] data = {};
         scores = new JTable(data, columnNames);
         JScrollPane scrollPane = new JScrollPane(scores);
-        scrollPane.setPreferredSize(new Dimension((int)(ox*checksize*0.5), (int)(oy*checksize*0.4)));
+        scrollPane.setPreferredSize(new Dimension((int)(30*checksize*0.5), (int)(30*checksize*0.4)));
         tables.add(scrollPane, BorderLayout.BEFORE_LINE_BEGINS);
     }
     private static void CreateButtons() {
@@ -201,12 +205,12 @@ public class GUI {
         });
         buttons.add(exit, BorderLayout.AFTER_LINE_ENDS);
         buttons.add(newGame, BorderLayout.BEFORE_LINE_BEGINS);
-        buttons.setPreferredSize(new Dimension((int)(ox*checksize), (int)(oy*checksize*0.1)));
+        buttons.setPreferredSize(new Dimension((int)(30*checksize), (int)(30*checksize*0.1)));
         rightSide.add(buttons, BorderLayout.CENTER);
     }
 
-    private static void RepaintField(List<SnakesProto.GameState.Snake> snakesList) { //repaints field to window
-        //System.out.println("repaintfield called");
+
+    private static void RepaintField(List<SnakesProto.GameState.Snake> snakesList, List<SnakesProto.GameState.Coord> foodList) { //repaints field to window
 
         for (int i = 0; i < ox * oy; i++){
             JButton b = buttonList.get(i);
@@ -277,7 +281,15 @@ public class GUI {
                 i++;
             }
         }
-        //Iterator
+        //int i = 0;
+        Iterator<SnakesProto.GameState.Coord> it = foodList.iterator();
+        while (it.hasNext()){
+            //System.out.println("paint food");
+            SnakesProto.GameState.Coord coord = it.next();
+            //repaintCheck(tmp.setY((Model.config.getHeight() + coord.getY() + prev.getY()) % Model.config.getHeight()).setX(prev.getX()).build(), snake.getPlayerId());
+            int butNum = coord.getY() * Model.config.getWidth() + coord.getX();
+            buttonList.get(butNum).setBackground(Color.GREEN);
+        }
     }
     private static void repaintCheck(SnakesProto.GameState.Coord coord, int playerId){
         System.out.println("repaintcheck ox = " + coord.getX() + ", oy = " + coord.getY());
@@ -285,33 +297,39 @@ public class GUI {
         if (playerId == Controller.playerId) buttonList.get(butNum).setBackground(Color.YELLOW);
         else buttonList.get(butNum).setBackground(Color.RED);
     }
-    public static void repaintGameList(ConcurrentHashMap<GameListMessage, LocalTime> table) {
+    public static void repaintGameList(ConcurrentHashMap<Sender, SnakesProto.GameMessage.AnnouncementMsg> table) {
         String[] columnNames = {"Name", "Players", "Size", "Food"};
+        String[][] empty = {};
+        DefaultTableModel model = new DefaultTableModel(empty,columnNames); // for example
+        gamelistinfo.setModel(model);
+        model.fireTableDataChanged();
+
         String[][] data = new String[table.size() + 1][5];
         int i = 0;
         //TODO: sync
-        Iterator<Map.Entry<GameListMessage, LocalTime>> it = table.entrySet().iterator();
+        Iterator<Map.Entry<Sender, SnakesProto.GameMessage.AnnouncementMsg>> it = table.entrySet().iterator();
         while(it.hasNext()){
-            Map.Entry<GameListMessage, LocalTime> pair = it.next();
-            data[i][0] = pair.getKey().sender.ip;
-            data[i][1] = Integer.toString(pair.getKey().announce.getPlayers().getPlayersList().size());
-            data[i][2] = pair.getKey().announce.getConfig().getWidth() + "x" +
-                         pair.getKey().announce.getConfig().getHeight();
-            data[i][3] = pair.getKey().announce.getConfig().getFoodStatic() + "+" +
-                         pair.getKey().announce.getConfig().getFoodPerPlayer() + "x";
+            Map.Entry<Sender, SnakesProto.GameMessage.AnnouncementMsg> pair = it.next();
+            data[i][0] = Integer.toString(pair.getKey().port);
+            data[i][1] = Integer.toString(pair.getValue().getPlayers().getPlayersList().size());
+            data[i][2] = pair.getValue().getConfig().getWidth() + "x" +
+                         pair.getValue().getConfig().getHeight();
+            data[i][3] = pair.getValue().getConfig().getFoodStatic() + "+" +
+                         pair.getValue().getConfig().getFoodPerPlayer() + "x";
             JButton b = connectButtons.get(i);
             ActionListener[] list = b.getActionListeners();
             //System.out.println(b.hashCode());
             if (list.length > 0) b.removeActionListener(list[0]);
-            b.setBackground(Color.BLUE);
-            b.setName(i + " : connect");
+            //b.setBackground(Color.BLUE);
+            b.setName(Integer.toString(i));
             //System.out.println("changed name for button");
-            b.addActionListener(new ConnectListener(pair.getKey().sender));
+            b.addActionListener(new ConnectListener(pair.getKey()));
             connectButtons.put(i, b);
+            i++;
         }
-        DefaultTableModel model = new DefaultTableModel(data,columnNames); // for example
-        gamelistinfo.setModel(model);
-        model.fireTableDataChanged();
+        DefaultTableModel model1 = new DefaultTableModel(data,columnNames); // for example
+        gamelistinfo.setModel(model1);
+        model1.fireTableDataChanged();
     }
     private static void RepaintSpecs(SnakesProto.GameConfig config) {
         String[] columnNames = {"Type", "Value"};
@@ -326,20 +344,24 @@ public class GUI {
                 {"node_timeout_ms", "", ""},
         };
         String s = "";
-        if (config.hasWidth()) data[0][2] = Integer.toString(config.getWidth());
-        if (config.hasHeight()) data[0][2] = Integer.toString(config.getHeight());
-        if (config.hasFoodStatic()) data[0][2] = Integer.toString(config.getFoodStatic());
-        if (config.hasFoodPerPlayer()) data[0][2] = Float.toString(config.getFoodPerPlayer());
-        if (config.hasStateDelayMs()) data[0][2] = Integer.toString(config.getStateDelayMs());
-        if (config.hasDeadFoodProb()) data[0][2] = Float.toString(config.getDeadFoodProb());
-        if (config.hasPingDelayMs()) data[0][2] = Integer.toString(config.getPingDelayMs());
-        if (config.hasNodeTimeoutMs()) data[0][2] = Integer.toString(config.getNodeTimeoutMs());
+        data[0][1] = Integer.toString(config.getWidth());
+        data[1][1] = Integer.toString(config.getHeight());
+        data[2][1] = Integer.toString(config.getFoodStatic());
+        data[3][1] = Float.toString(config.getFoodPerPlayer());
+        data[4][1] = Integer.toString(config.getStateDelayMs());
+        data[5][1] = Float.toString(config.getDeadFoodProb());
+        data[6][1] = Integer.toString(config.getPingDelayMs());
+        data[7][1] = Integer.toString(config.getNodeTimeoutMs());
         DefaultTableModel model = new DefaultTableModel(data,columnNames);
         gameSpecs.setModel(model);
         model.fireTableDataChanged();
     }
     private static void RepaintScores(java.util.List<SnakesProto.GamePlayer> players) {
         String[] columnNames = {"Position", "Name", "Score", "IsMe"};
+        String[][] empty = {};
+        DefaultTableModel model = new DefaultTableModel(empty,columnNames); // for example
+        scores.setModel(model);
+        model.fireTableDataChanged();
         String[][] data = new String[players.size() + 1][5];
         Iterator<SnakesProto.GamePlayer> playerIterator = players.iterator();
         int i = 0;
@@ -351,9 +373,9 @@ public class GUI {
             if (player.getId() == Controller.playerId) data[i][3] = "yes";
             else data[i][3] = "no";
         }
-        DefaultTableModel model = new DefaultTableModel(data,columnNames); // for example
-        scores.setModel(model);
-        model.fireTableDataChanged();
+        DefaultTableModel model1 = new DefaultTableModel(data,columnNames); // for example
+        scores.setModel(model1);
+        model1.fireTableDataChanged();
     }
     private static void RepaintButtons() {
 
