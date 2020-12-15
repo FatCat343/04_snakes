@@ -11,8 +11,10 @@ import static java.lang.Thread.sleep;
 
 public class GameListSender implements Runnable {
     public static MulticastSocket socket;
+    public static boolean running;
     public static void start(){
         Thread t = new Thread(new GameListSender());
+        running = true;
         t.start();
     }
     public static void sendUDPMessage(SnakesProto.GameMessage msg, String ipAddress, int port, MulticastSocket socket) throws IOException {
@@ -36,7 +38,7 @@ public class GameListSender implements Runnable {
             SnakesProto.GameMessage.Builder msg = SnakesProto.GameMessage.newBuilder();
             SnakesProto.GameMessage.AnnouncementMsg.Builder ann = SnakesProto.GameMessage.AnnouncementMsg.newBuilder();
             ann.setConfig(Model.config);
-            while (true) {
+            while (running) {
                 ann.setPlayers(Model.state.getPlayers());
                 msg.setAnnouncement(ann.build());
                 msg.setMsgSeq(Model.getMsgId());

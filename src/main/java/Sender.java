@@ -14,11 +14,11 @@ public class Sender {
         }
         final Sender s = (Sender) obj;
         if (s.port == port && s.ip.equals(ip)) {
-            System.out.println("equal");
+           // System.out.println("equal");
             return true;
         }
         else {
-            System.out.println("not equal");
+            //System.out.println("not equal");
             return false;
         }
     }

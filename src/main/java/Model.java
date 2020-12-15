@@ -53,8 +53,8 @@ public class Model {
 
     public static void parse(String filename){ //parse config file to get params
         SnakesProto.GameConfig.Builder tmp = SnakesProto.GameConfig.newBuilder();
-        //tmp.setHeight(7);
-        //tmp.setWidth(7);
+        tmp.setHeight(20);
+        tmp.setWidth(20);
 
         config = tmp.build();
     }
@@ -66,6 +66,7 @@ public class Model {
         if (Controller.playerId == Controller.masterId){
             //stop game -->give it to deputy
             GameProcess.running = false;
+            GameListSender.running = false;
             //GameProcess.changeState(Controller.playerId, VIEWER);
 
             if (Controller.findRole(DEPUTY) < 0){
@@ -149,12 +150,14 @@ public class Model {
         p.setPort(sender.port);
         p.setRole(SnakesProto.NodeRole.NORMAL);
         p.setScore(0);
+        //we have same logic in sending error and join -- receiver is not in player's list
         NetworkWriter.sendError(message.build(), p.build());
     }
     public static void sendJoin(SnakesProto.GameMessage gm, Sender sender){
         SnakesProto.GameMessage.Builder message = SnakesProto.GameMessage.newBuilder();
-        SnakesProto.GameMessage.ErrorMsg.Builder error = SnakesProto.GameMessage.ErrorMsg.newBuilder();
-        message.setError(error);
+        SnakesProto.GameMessage.JoinMsg.Builder join = SnakesProto.GameMessage.JoinMsg.newBuilder();
+        join.setName(Controller.name);
+        message.setJoin(join);
         message.setMsgSeq(getMsgId());
 
         SnakesProto.GamePlayer.Builder p = SnakesProto.GamePlayer.newBuilder();
@@ -162,7 +165,7 @@ public class Model {
         p.setName("");
         p.setIpAddress(sender.ip);
         p.setPort(sender.port);
-        p.setRole(SnakesProto.NodeRole.NORMAL);
+        p.setRole(SnakesProto.NodeRole.MASTER);
         p.setScore(0);
         NetworkWriter.sendError(message.build(), p.build());
     }

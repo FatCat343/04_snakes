@@ -19,7 +19,7 @@ public class Network {
             //System.out.println("port = " +Client.port);
 
             Model.socket.receive(packet);
-            sender.ip = packet.getAddress().toString();
+            sender.ip = packet.getAddress().toString().split("/")[1];
             sender.port = packet.getPort();
             //System.out.println("received");
             //int byteCount = packet.getLength();
@@ -28,6 +28,7 @@ public class Network {
             //Object o = is.readObject();
             //is.close();
             SnakesProto.GameMessage msg = SnakesProto.GameMessage.parseFrom(Arrays.copyOf(packet.getData(), packet.getLength()));
+            System.out.println("received msg from ip = " + sender.ip + " , port = " + sender.port);
             return msg;
         }
         catch (IOException e) {
@@ -41,7 +42,7 @@ public class Network {
         try{
             byte[] sendBuf = msg.toByteArray();
             DatagramPacket packet = new DatagramPacket(sendBuf, sendBuf.length, InetAddress.getByName(receiver.getIpAddress()), receiver.getPort());
-            //System.out.println("sends " + type + " with id = " + id + " to addr = " + cld.addr + " to port = " + cld.port);
+            System.out.println("sends " + " to addr = " + receiver.getIpAddress() + " to port = " + receiver.getPort());
             Model.socket.send(packet);
             //TODO: make sync iter
             NetworkWriter.lastSent.put(receiver, LocalTime.now());

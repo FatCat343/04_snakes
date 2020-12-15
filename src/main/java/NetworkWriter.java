@@ -26,28 +26,25 @@ public class NetworkWriter implements Runnable {
                 message = queue.poll(Model.config.getPingDelayMs(), TimeUnit.MILLISECONDS);
                 if (message != null) {
                     switch (message.getTypeCase()) {
-                        case PING:{
+                        case PING:
+                        case ERROR:
+                        case STEER:
+                        case JOIN: {
                             send_single(message);
-                        }
-                        case STEER:{
-                            send_single(message);
+                            break;
                         }
                         case ACK:{
                             send_ack(message);
+                            break;
                         }
                         case STATE:{
                             send_all(message);
+                            break;
                         }
                         case ANNOUNCEMENT:{
                             System.out.println("ERROR, wrong type of message");
-                        }
-                        case JOIN:{
-                            send_single(message);
-                        }
-                        case ERROR:{
-                            send_single(message);
-                            //wont be in queue
-                        }
+                            break;
+                        }//wont be in queue
                         case ROLE_CHANGE:{ //always have sender_id and receiver_id
                             if (message.getRoleChange().hasSenderRole() && message.getRoleChange().getSenderRole() == SnakesProto.NodeRole.MASTER) {
                                 if (!message.getRoleChange().hasReceiverRole()){

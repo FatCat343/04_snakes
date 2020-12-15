@@ -193,9 +193,12 @@ public class GameProcess implements Runnable {
             p.setRole(SnakesProto.NodeRole.NORMAL);
             p.setScore(0);
 
-            gameState.getPlayers().getPlayersList().add(p.build());
-            Model.setState(gameState.build());
-            Model.sendAck(gm, Controller.getId(sender));
+            gameState.addSnakes(res);
+            SnakesProto.GamePlayers.Builder pls = SnakesProto.GamePlayers.newBuilder();
+            pls.addPlayers(p);
+            gameState.setPlayers(pls);
+
+            Model.sendAck(gm, res.getPlayerId());
         }
         else {
             //cant

@@ -20,8 +20,11 @@ public class NetworkReader implements Runnable{
         while (true) {
             Sender sender = new Sender();
             SnakesProto.GameMessage gm = Network.receive(sender);
-            if (gm == null) continue;
-            System.out.println("sender ip = " + sender.ip);
+            if (gm == null) {
+                System.out.println("received null message");
+                continue;
+            }
+            //System.out.println("sender ip = " + sender.ip);
             int alreadyReceived = 0;
             //TODO: make iteration synchronised
             for (Map.Entry<Sender, SnakesProto.GameMessage> pair : received.entrySet()) {
@@ -32,14 +35,23 @@ public class NetworkReader implements Runnable{
                     break;
                 }
             }
-            if (alreadyReceived == 1) continue;
+            if (alreadyReceived == 1) {
+                System.out.println("already received this message");
+                continue;
+            }
             //TODO: check if we need messages from this sender
             if (Model.state == null){
-                if (!Controller.neededsenders.contains(sender)) continue;
+                if (!Controller.neededsenders.contains(sender)) {
+                    System.out.println("dont wait messages from this sender");
+                    continue;
+                }
             }
             else {
                 if (Controller.getId(sender) == -1){
-                    continue;
+                    if (!gm.getTypeCase().equals(SnakesProto.GameMessage.TypeCase.JOIN)) {
+                        System.out.println("dont wait messages from this sender");
+                        continue;
+                    }
                 }
             }
 
@@ -50,28 +62,42 @@ public class NetworkReader implements Runnable{
             received.put(sender, gm);
             switch (gm.getTypeCase()) {
                 case PING:{
+                    System.out.println("received ping");
                     Controller.pingAnswer(gm, sender);
                 }
                 case STEER:{
+                    System.out.println("received steer");
                     Controller.steer(gm, sender);
+                    break;
                 }
                 case ACK:{
+                    System.out.println("received ack");
                     Controller.ack(gm, sender);
+                    break;
                 }
                 case STATE:{
+                    System.out.println("received state");
                     Controller.setState(gm, sender);
+                    break;
                 }
                 case ANNOUNCEMENT:{
                    System.out.println("ERROR, multicast received by wrong socket");
+                   break;
                 }
                 case JOIN:{
+                    System.out.println("received join");
                     Controller.join(gm, sender);
+                    break;
                 }
                 case ERROR:{
+                    System.out.println("received error");
                     Controller.error(gm, sender);
+                    break;
                 }
                 case ROLE_CHANGE:{
+                    System.out.println("received role_change");
                     Controller.roleChange(gm, sender);
+                    break;
                 }
             }
         }

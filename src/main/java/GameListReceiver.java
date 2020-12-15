@@ -44,7 +44,7 @@ public class GameListReceiver implements Runnable {
                 //System.out.println(pair.getKey() + "  " + pair.getValue() + "   " + LocalTime.now());
                 Sender key = pair.getKey();
 
-                System.out.println("remove " + key.port + "  " + key.ip);
+                //System.out.println("remove " + key.port + "  " + key.ip);
                 table.remove(key);
                 it.remove();
             }
@@ -72,14 +72,13 @@ public class GameListReceiver implements Runnable {
                 if (iter.next().getRole().equals(SnakesProto.NodeRole.MASTER)) break;
                 else j++;
             }
-            sender.ip = packet.getAddress().toString().split("/")[1];
-            sender.port = msg.getAnnouncement().getPlayers().getPlayers(j).getPort();
-            System.out.println("received packet from ip = " + sender.ip + "  port = " + sender.port);
-            //GameListMessage message = new GameListMessage();
-            //message.sender = sender;
-            //message.announce = msg.getAnnouncement();
-            UpdateTable(msg.getAnnouncement(), sender);
-            System.out.println("servers available: "+clients.size() + "  table size = " + table.size());
+            if (j < msg.getAnnouncement().getPlayers().getPlayersList().size()) {
+                sender.ip = packet.getAddress().toString().split("/")[1];
+                sender.port = msg.getAnnouncement().getPlayers().getPlayers(j).getPort();
+                //System.out.println("received packet from ip = " + sender.ip + "  port = " + sender.port);
+
+                UpdateTable(msg.getAnnouncement(), sender);
+            }
         }
     }
 

@@ -41,13 +41,14 @@ public class Controller {
     }
     public static void connect(Sender sender){
         exit();
-        Model.setState(null);
+        Model.state = null;
+        //Model.setState(null);
         SnakesProto.GameMessage.Builder gm = SnakesProto.GameMessage.newBuilder();
         SnakesProto.GameMessage.JoinMsg.Builder join = SnakesProto.GameMessage.JoinMsg.newBuilder();
         join.setName(Controller.name);
         gm.setJoin(join.build());
         gm.setMsgSeq(Model.getMsgId());
-        neededsenders.remove(0);
+        if (neededsenders.size() > 1) neededsenders.remove(0);
         neededsenders.add(sender);
         Model.sendJoin(gm.build(), sender);
     }
