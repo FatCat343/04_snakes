@@ -68,9 +68,13 @@ public class GameProcess implements Runnable {
                 e.printStackTrace();
             }
             gameState.setStateOrder(getStateOrder());
-            Model.setState(gameState.build());
-            Model.sendState(gameState.build());
-            //Model.showState(gameState.build());
+            if (running) {
+                System.out.println("update model");
+                Model.setState(gameState.build());
+                Model.sendState(gameState.build());
+                //Model.showState(gameState.build());
+            }
+            else System.out.println("stops working");
         }
     }
     public static void start() {
@@ -153,7 +157,11 @@ public class GameProcess implements Runnable {
     }
     public static void deletePlayer(int playerId){
         //TODO: sync
-        gameState.getPlayers().getPlayersList().remove(playerId);
+        //gameState.getPlayers().getPlayersList().remove(playerId);
+        SnakesProto.GamePlayers.Builder players = SnakesProto.GamePlayers.newBuilder(gameState.getPlayers());
+        players.removePlayers(playerId);
+        gameState.setPlayers(players);
+
         Model.setState(gameState.build());
     }
     private static int newZombieSnakeid(){
@@ -184,6 +192,7 @@ public class GameProcess implements Runnable {
         SnakesProto.GameState.Snake res = findPlace(newPlayerId()); //finds + places if possible
         if (res != null) {
             //can be added, snake already placed + configured
+            System.out.println("can join player");
             SnakesProto.GamePlayer.Builder p = SnakesProto.GamePlayer.newBuilder();
 
             p.setId(res.getPlayerId());
@@ -194,7 +203,7 @@ public class GameProcess implements Runnable {
             p.setScore(0);
 
             gameState.addSnakes(res);
-            SnakesProto.GamePlayers.Builder pls = SnakesProto.GamePlayers.newBuilder();
+            SnakesProto.GamePlayers.Builder pls = SnakesProto.GamePlayers.newBuilder(gameState.getPlayers());
             pls.addPlayers(p);
             gameState.setPlayers(pls);
 
@@ -202,6 +211,7 @@ public class GameProcess implements Runnable {
         }
         else {
             //cant
+            System.out.println("cant join player");
             Model.sendError(gm, sender, "Cant join");
         }
     }
@@ -457,12 +467,12 @@ public class GameProcess implements Runnable {
 
             SnakesProto.GameState.Snake.Builder newsnake = SnakesProto.GameState.Snake.newBuilder(snake);
            // snakesListnew.add(newsnake);
-            System.out.println(newsnake);
+            //System.out.println(newsnake);
             List<SnakesProto.GameState.Coord>coordList = newsnake.getPointsList();
             SnakesProto.GameState.Coord tail = coordList.get(coordList.size() - 1);
             SnakesProto.GameState.Coord head = coordList.get(0);
             SnakesProto.GameState.Coord newHead = new_checks.get(newsnake.getPlayerId());
-            System.out.println(newHead);
+            //System.out.println(newHead);
             SnakesProto.GameState.Coord head_next = coordList.get(1);
             int step = 1;
             if (!food_eaters.contains(snake.getPlayerId())) {
@@ -604,7 +614,7 @@ public class GameProcess implements Runnable {
     }
     public static int newPlayerId(){
         List<SnakesProto.GamePlayer> playerList = gameState.getPlayers().getPlayersList();
-        int id = playerList.size() + 1;
+        int id = playerList.size();
         for (int i = 0; i < playerList.size(); i++) {
             int j;
             for (j = 0; j < playerList.size(); j++) {

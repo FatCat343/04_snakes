@@ -89,7 +89,7 @@ public class GUI {
 //        CreateButtons();
 //    }
     public static void repaint(SnakesProto.GameState state, ConcurrentHashMap<Sender, SnakesProto.GameMessage.AnnouncementMsg> table){
-        //System.out.println(state);
+        System.out.println(state);
         ox = state.getConfig().getWidth();
         oy = state.getConfig().getHeight();
         RepaintField(state.getSnakesList(), state.getFoodsList());
@@ -292,7 +292,7 @@ public class GUI {
         }
     }
     private static void repaintCheck(SnakesProto.GameState.Coord coord, int playerId){
-        System.out.println("repaintcheck ox = " + coord.getX() + ", oy = " + coord.getY());
+        //System.out.println("repaintcheck ox = " + coord.getX() + ", oy = " + coord.getY());
         int butNum = coord.getY() * Model.config.getWidth() + coord.getX();
         if (playerId == Controller.playerId) buttonList.get(butNum).setBackground(Color.YELLOW);
         else buttonList.get(butNum).setBackground(Color.RED);
@@ -372,6 +372,7 @@ public class GUI {
             data[i][2] = Integer.toString(player.getScore());
             if (player.getId() == Controller.playerId) data[i][3] = "yes";
             else data[i][3] = "no";
+            i++;
         }
         DefaultTableModel model1 = new DefaultTableModel(data,columnNames); // for example
         scores.setModel(model1);

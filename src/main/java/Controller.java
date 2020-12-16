@@ -23,9 +23,11 @@ public class Controller {
         name = args[0];
         port = Integer.parseInt(args[1]);
         //Model.Init(); // инициализирует необходимые структуры
+
         Model.Init();
         //Model.StartNew(); //запускает одиночную игру
         NetworkReader.start();
+        NetworkWriter.start();
     }
     public static void setState(SnakesProto.GameMessage gm, Sender sender){
         //changes state of ours snake
@@ -42,6 +44,9 @@ public class Controller {
     public static void connect(Sender sender){
         exit();
         Model.state = null;
+        if (Model.state == null) {
+            System.out.println("setted state to null");
+        }
         //Model.setState(null);
         SnakesProto.GameMessage.Builder gm = SnakesProto.GameMessage.newBuilder();
         SnakesProto.GameMessage.JoinMsg.Builder join = SnakesProto.GameMessage.JoinMsg.newBuilder();
@@ -49,7 +54,9 @@ public class Controller {
         gm.setJoin(join.build());
         gm.setMsgSeq(Model.getMsgId());
         if (neededsenders.size() > 1) neededsenders.remove(0);
-        neededsenders.add(sender);
+        if (neededsenders.add(sender)) {
+            System.out.println("wait ack from ip = " + sender.ip + ":" + sender.port);
+        };
         Model.sendJoin(gm.build(), sender);
     }
     public static void steer(SnakesProto.Direction dir){

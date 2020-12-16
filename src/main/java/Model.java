@@ -194,6 +194,7 @@ public class Model {
         GameProcess.setSteer(dir, playerId);
     }
     public static void sendAck(SnakesProto.GameMessage message, int receiverId){
+        System.out.println("sendAck called");
         SnakesProto.GameMessage.Builder gm = SnakesProto.GameMessage.newBuilder();
         SnakesProto.GameMessage.AckMsg.Builder ack = SnakesProto.GameMessage.AckMsg.newBuilder();
         gm.setAck(ack.build());

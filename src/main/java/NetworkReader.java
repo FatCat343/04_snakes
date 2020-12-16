@@ -42,7 +42,7 @@ public class NetworkReader implements Runnable{
             //TODO: check if we need messages from this sender
             if (Model.state == null){
                 if (!Controller.neededsenders.contains(sender)) {
-                    System.out.println("dont wait messages from this sender");
+                    System.out.println("dont wait messages from this sender, list size = " + Controller.neededsenders.size());
                     continue;
                 }
             }
