@@ -37,6 +37,7 @@ public class NetworkReader implements Runnable{
             }
             if (alreadyReceived == 1) {
                 System.out.println("already received this message");
+                sendAck(gm, sender);
                 continue;
             }
             //TODO: check if we need messages from this sender
@@ -62,8 +63,9 @@ public class NetworkReader implements Runnable{
             received.put(sender, gm);
             switch (gm.getTypeCase()) {
                 case PING:{
-                    System.out.println("received ping");
+                    //System.out.println("received ping");
                     Controller.pingAnswer(gm, sender);
+                    break;
                 }
                 case STEER:{
                     System.out.println("received steer");
@@ -71,7 +73,7 @@ public class NetworkReader implements Runnable{
                     break;
                 }
                 case ACK:{
-                    System.out.println("received ack");
+                    //System.out.println("received ack");
                     Controller.ack(gm, sender);
                     break;
                 }
@@ -101,6 +103,13 @@ public class NetworkReader implements Runnable{
                 }
             }
         }
+    }
+
+    public static void sendAck(SnakesProto.GameMessage gm, Sender sender){
+        SnakesProto.GameMessage.Builder message = SnakesProto.GameMessage.newBuilder();
+        SnakesProto.GameMessage.AckMsg.Builder ack = SnakesProto.GameMessage.AckMsg.newBuilder();
+        message.setAck(ack).setMsgSeq(Model.getMsgId());
+        Network.send(message.build(), sender);
     }
 
 }

@@ -13,9 +13,13 @@ public class GameProcess implements Runnable {
     public static ConcurrentHashMap<Integer, SnakesProto.Direction> steers = new ConcurrentHashMap<>();
     public static SnakesProto.GameState.Builder gameState;
     public static int aliveSnakes;
+    public static Thread t;
     public static boolean running;
+    public static boolean finished;
     private static int stateOrder = 0;
     GameProcess(){
+        running = true;
+        finished = false;
         gameState = SnakesProto.GameState.newBuilder();
         gameState.setConfig(Model.config);
         gameState.setStateOrder(getStateOrder());
@@ -59,6 +63,7 @@ public class GameProcess implements Runnable {
     }
 
     public void run() {
+        System.out.println("starts run");
         while(running) {
             try {
                 sleep(2000);
@@ -76,12 +81,23 @@ public class GameProcess implements Runnable {
             }
             else System.out.println("stops working");
         }
+        System.out.println("finished");
+        finished = true;
     }
     public static void start() {
-        Thread t = new Thread(new GameProcess());
+        t = new Thread(new GameProcess());
         //aliveSnakes = 1;
         running = true;
         t.start();
+    }
+    public static void restart() {
+        //aliveSnakes = 1;
+        running = true;
+        //t.start();
+    }
+    public static void stop(){
+        //t.interrupt();
+        running = false;
     }
     public static void continueGame(SnakesProto.GameState state){
         Thread t = new Thread(new GameProcess(state));
@@ -113,6 +129,7 @@ public class GameProcess implements Runnable {
         Model.setState(gameState.build());
     }
     public static void setSteer(SnakesProto.Direction dir, int id){
+        System.out.println("set steer "+ dir + " to player " + id);
         //TODO: sync iteration
         List<SnakesProto.GameState.Snake> snakesList = gameState.getSnakesList();
         Iterator<SnakesProto.GameState.Snake> iter = snakesList.iterator();
@@ -207,7 +224,10 @@ public class GameProcess implements Runnable {
             pls.addPlayers(p);
             gameState.setPlayers(pls);
 
+            Model.state = gameState.build();
+
             Model.sendAck(gm, res.getPlayerId());
+            Model.sendState(Model.state);
         }
         else {
             //cant
@@ -326,6 +346,7 @@ public class GameProcess implements Runnable {
         Iterator<SnakesProto.GameState.Snake> iter = snakesList.iterator();
         SnakesProto.Direction dir = null;
         while (iter.hasNext()) {
+            dir = null;
             SnakesProto.GameState.Snake snake = iter.next();
             if (steers.containsKey(snake.getPlayerId())){
                 dir = steers.get(snake.getPlayerId());

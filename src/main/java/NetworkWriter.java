@@ -30,7 +30,7 @@ public class NetworkWriter implements Runnable {
                 //System.out.println("waiting on new messages to send");
                 message = queue.poll(Model.config.getPingDelayMs(), TimeUnit.MILLISECONDS);
                 if (message != null) {
-                    System.out.println("polled message of type " + message.getTypeCase());
+                    //System.out.println("polled message of type " + message.getTypeCase());
                     switch (message.getTypeCase()) {
                         case PING:
                         case ERROR:
@@ -146,7 +146,7 @@ public class NetworkWriter implements Runnable {
     }
     public static void sendError(SnakesProto.GameMessage message, SnakesProto.GamePlayer receiver){
         //TODO: ?????????
-        System.out.println("sends error to " + receiver.getIpAddress()+":"+receiver.getPort());
+        //System.out.println("sends error to " + receiver.getIpAddress()+":"+receiver.getPort());
         MessageCustom mst = new MessageCustom();
         mst.gm = message;
         mst.branches = new ArrayList<>();
@@ -160,7 +160,8 @@ public class NetworkWriter implements Runnable {
         while (iter.hasNext()) {
             MessageCustom msg = iter.next();
             if ((msg.gm.getReceiverId() == message.getReceiverId()) && (msg.gm.getTypeCase() == message.getTypeCase())) {
-                resend.remove(iter.next());
+                //resend.remove(iter.next());
+                iter.remove();
                 break;
             }
         }
@@ -175,7 +176,7 @@ public class NetworkWriter implements Runnable {
         t.start();
     }
     private void send_all(SnakesProto.GameMessage message){
-        System.out.println("sends message to all");
+        //System.out.println("sends message to all");
         MessageCustom mst = new MessageCustom();
         mst.gm = message;
         //TODO : check if conroller.players changes between init of branches and iteration(client leaves or comes)
@@ -204,7 +205,7 @@ public class NetworkWriter implements Runnable {
         }
     }
     private void send_single(SnakesProto.GameMessage message){
-        System.out.println("send msg to single receiver, id = " + message.getReceiverId());
+       // System.out.println("send msg to single receiver, id = " + message.getReceiverId());
         MessageCustom mst = new MessageCustom();
         mst.gm = message;
         mst.branches = new ArrayList<>();
@@ -231,10 +232,11 @@ public class NetworkWriter implements Runnable {
         }
     }
     private static void send_ack(SnakesProto.GameMessage gm){
-        System.out.println("send ack to id = " + gm.getReceiverId());
+       // System.out.println("send ack to id = " + gm.getReceiverId());
         //same as send_single, but don't add to resend
         SnakesProto.GamePlayer player = Controller.getPlayer(gm.getReceiverId());
-        if (player == null) {
+        if ((player == null)) {
+            System.out.println("player == null");
             return;
         }
         //TODO: make iteration synchronized
@@ -250,7 +252,7 @@ public class NetworkWriter implements Runnable {
 
     }
     public void deleteclients(List<SnakesProto.GamePlayer> clients){
-        //System.out.println("delete clients called");
+        System.out.println("delete clients called");
         if (Model.state != null) {
             //TODO: check on importance of synchronization
             Iterator<SnakesProto.GamePlayer> it = clients.iterator();

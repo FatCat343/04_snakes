@@ -31,6 +31,7 @@ class ConnectListener implements ActionListener{
 
 public class GUI {
     public static JFrame window = new JFrame("snake");
+    public static JFrame error = new JFrame("error");
     private static JPanel game;
     private static JPanel rightSide;
     private static JPanel tables;
@@ -89,7 +90,7 @@ public class GUI {
 //        CreateButtons();
 //    }
     public static void repaint(SnakesProto.GameState state, ConcurrentHashMap<Sender, SnakesProto.GameMessage.AnnouncementMsg> table){
-        System.out.println(state);
+        //System.out.println(state);
         ox = state.getConfig().getWidth();
         oy = state.getConfig().getHeight();
         RepaintField(state.getSnakesList(), state.getFoodsList());
@@ -99,18 +100,18 @@ public class GUI {
         RepaintButtons();
     }
     public static void error(String message){
-        JFrame f = new JFrame("Error!");
+        //JFrame f = new JFrame("Error!");
         JPanel panel = new JPanel();
         JTextField textField = new JTextField();
         textField.setBackground(Color.WHITE);
         textField.setColumns(14); //ширина поля
         textField.setText(message);
         panel.add(textField);
-        f.getContentPane().add(panel);
-        f.setSize(400,400);
-        f.pack();
-        f.setLocationRelativeTo(null);
-        f.setVisible(true);
+        error.getContentPane().add(panel);
+        error.setSize(400,400);
+        error.pack();
+        error.setLocationRelativeTo(null);
+        error.setVisible(true);
     }
     private static void CreateField() { //adds field to window
         gameField = new JPanel();

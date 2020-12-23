@@ -14,6 +14,7 @@ public class Controller {
     //public static List<SnakesProto.GamePlayer> players = new ArrayList<>(); //list of ALL clients
     public static int playerId = 0;
     public static int masterId = 1;
+    public static Sender masterSender;
     public static String name;
     public static int port;
     public static SnakesProto.NodeRole role = VIEWER;
@@ -34,7 +35,8 @@ public class Controller {
         Model.config = gm.getState().getState().getConfig();
         //TODO: make change synchronized
         //players = gm.getState().getState().getPlayers().getPlayersList();
-        Model.setState(gm.getState().getState());
+        if (neededsenders.size() > 0) Controller.neededsenders.remove(0);
+        Model.setState(gm.getState().getState(), sender);
         Model.sendAck(gm, getId(sender));
     }
 
@@ -53,14 +55,14 @@ public class Controller {
         join.setName(Controller.name);
         gm.setJoin(join.build());
         gm.setMsgSeq(Model.getMsgId());
-        if (neededsenders.size() > 1) neededsenders.remove(0);
+        if (neededsenders.size() >= 1) neededsenders.remove(0);
         if (neededsenders.add(sender)) {
             System.out.println("wait ack from ip = " + sender.ip + ":" + sender.port);
         };
         Model.sendJoin(gm.build(), sender);
     }
     public static void steer(SnakesProto.Direction dir){
-        System.out.println(role);
+        System.out.println("steer " + dir + "role = " + role);
         if (role.equals(MASTER)) {
             System.out.println("steer " + dir);
             Model.steer(dir, playerId);
@@ -69,6 +71,7 @@ public class Controller {
     }
     public static void steer(SnakesProto.GameMessage gm, Sender sender){
         SnakesProto.Direction dir = gm.getSteer().getDirection();
+        System.out.println("steer " + dir);
         int id = getId(sender);
         if (id != -1) {
             Model.steer(dir, id);
@@ -80,7 +83,26 @@ public class Controller {
         Model.sendAck(gm, getId(sender));
     }
     public static void ack(SnakesProto.GameMessage gm, Sender sender){
-        Model.getAck(gm, getPlayer(sender));
+        if (neededsenders.size() == 0) Model.getAck(gm, getPlayer(sender));
+        else {
+            Sender sender1 = neededsenders.get(0);
+            if (sender.equals(sender1)){
+                System.out.println("got ack from neededsender");
+
+                Controller.masterSender = sender;
+                Controller.playerId = gm.getReceiverId();
+                SnakesProto.GamePlayer.Builder p = SnakesProto.GamePlayer.newBuilder();
+                p.setId(0);
+                p.setName("");
+                p.setIpAddress(sender.ip);
+                p.setPort(sender.port);
+                p.setRole(SnakesProto.NodeRole.MASTER);
+                p.setScore(0);
+
+                Model.getAck(gm, p.build());
+            }
+
+        }
     }
     public static void join(SnakesProto.GameMessage gm, Sender sender){
         Model.join(gm, sender);
@@ -91,10 +113,12 @@ public class Controller {
             if (gm.getRoleChange().getSenderRole().equals(SnakesProto.NodeRole.VIEWER)){
                 if (gm.getRoleChange().hasReceiverRole()){
                     if (gm.getRoleChange().getReceiverRole().equals(MASTER)){
+                        System.out.println("become master");
                         becomeMaster();
                     }
                 }
                 else {
+                    System.out.println("make smn viewer");
                     Model.makeViewer(gm.getSenderId());
                 }
             }
@@ -102,13 +126,16 @@ public class Controller {
                 if (gm.getRoleChange().hasReceiverRole()){
                     if (gm.getRoleChange().getReceiverRole().equals(SnakesProto.NodeRole.DEPUTY)){
                         //become deputy
+                        System.out.println("become deputy");
                         Controller.role = SnakesProto.NodeRole.DEPUTY;
                     }
                     if (gm.getRoleChange().getReceiverRole().equals(SnakesProto.NodeRole.VIEWER)){
+                        System.out.println("become viewer");
                         Model.becomeViewer(Controller.playerId);
                     }
                 }
                 else {
+                    System.out.println("new master with id =" + gm.getSenderId());
                     masterId = gm.getSenderId();
                 }
             }
@@ -129,7 +156,10 @@ public class Controller {
 
     }
     public static void pingAnswer(SnakesProto.GameMessage gm, Sender sender){
-        Model.sendAck(gm, getId(sender));
+        if (neededsenders.size() == 0) Model.sendAck(gm, getId(sender));
+        else {
+            Model.sendAck(gm, 0);
+        }
     }
     public static void exit() {
         Model.exit();

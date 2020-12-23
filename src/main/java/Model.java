@@ -4,6 +4,7 @@ import me.ippolitov.fit.snakes.SnakesProto;
 
 import java.net.DatagramSocket;
 import java.net.SocketException;
+import java.sql.Connection;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -15,6 +16,7 @@ public class Model {
     public int[] field;
     public int food;
     public static DatagramSocket socket;
+    //public static GameProcess game;
     //public static ConcurrentHashMap<String, State> states = new ConcurrentHashMap<String, State>();
     public static SnakesProto.GameState state;
     public static SnakesProto.GameConfig config;
@@ -26,6 +28,8 @@ public class Model {
             GameListReceiver.start();
             ///
             GUI.init(config); //set params in init
+            //new GameProcess();
+            //System.out.println(game.running);
             GameProcess.start();
         } catch (SocketException e) {
             e.printStackTrace();
@@ -37,12 +41,16 @@ public class Model {
 
 
 
-    public static void StartNew(){
-        exit();
-        GameProcess.start();
-        Controller.playerId = 0;
-        Controller.masterId = 0;
-        Controller.role = MASTER;
+    public static void StartNew() {
+        if (GameProcess.finished = true) {
+            exit();
+            new GameProcess();
+            //GameProcess.restart();
+            GameProcess.restart();
+            Controller.playerId = 0;
+            Controller.masterId = 0;
+            Controller.role = MASTER;
+        }
         //adding is in start
         //GameProcess.newPlayer(null, null);
 
@@ -67,6 +75,7 @@ public class Model {
             //stop game -->give it to deputy
             GameProcess.running = false;
             GameListSender.running = false;
+            GameProcess.stop();
             //GameProcess.changeState(Controller.playerId, VIEWER);
 
             if (Controller.findRole(DEPUTY) < 0){
@@ -93,9 +102,10 @@ public class Model {
         }
 
     }
-    public static int getMsgId(){
+    public synchronized static int getMsgId(){
         //TODO: sync
-        msgNum++;
+            msgNum++;
+
         return msgNum;
     }
     public static void join(SnakesProto.GameMessage gm, Sender sender){
@@ -128,6 +138,25 @@ public class Model {
         //update controller.players
         GUI.repaint(state, GameListReceiver.table);
     }
+
+    public static void setState(SnakesProto.GameState state1, Sender sender){
+        //TODO : sync
+        state = state1;
+        SnakesProto.GameState.Builder newstate = SnakesProto.GameState.newBuilder(state1);
+        SnakesProto.GamePlayers.Builder players = SnakesProto.GamePlayers.newBuilder(state.getPlayers());
+        int masterId = Controller.findRole(MASTER);
+        Controller.masterId = masterId;
+        Controller.role = Controller.getRole(Controller.playerId);
+        SnakesProto.GamePlayer.Builder master = SnakesProto.GamePlayer.newBuilder(players.getPlayers(masterId));
+        master.setIpAddress(sender.ip);
+        master.setPort(sender.port);
+        players.setPlayers(masterId, master.build());
+        newstate.setPlayers(players.build());
+        state = newstate.build();
+        //update controller.players
+        GUI.repaint(state, GameListReceiver.table);
+    }
+
     public static void setDeputy(int deputyId){
         //change deputy id state to deputy
         GameProcess.changeState(deputyId, DEPUTY);
@@ -194,13 +223,30 @@ public class Model {
         GameProcess.setSteer(dir, playerId);
     }
     public static void sendAck(SnakesProto.GameMessage message, int receiverId){
-        System.out.println("sendAck called");
-        SnakesProto.GameMessage.Builder gm = SnakesProto.GameMessage.newBuilder();
-        SnakesProto.GameMessage.AckMsg.Builder ack = SnakesProto.GameMessage.AckMsg.newBuilder();
-        gm.setAck(ack.build());
-        gm.setReceiverId(receiverId);
-        gm.setMsgSeq(message.getMsgSeq());
-        NetworkWriter.queue.add(gm.build());
+        if (Controller.neededsenders.size() == 0) {
+            //System.out.println("sendAck called");
+            SnakesProto.GameMessage.Builder gm = SnakesProto.GameMessage.newBuilder();
+            SnakesProto.GameMessage.AckMsg.Builder ack = SnakesProto.GameMessage.AckMsg.newBuilder();
+            gm.setAck(ack.build());
+            gm.setReceiverId(receiverId);
+            gm.setMsgSeq(message.getMsgSeq());
+            NetworkWriter.queue.add(gm.build());
+        }
+        else {
+            //System.out.println("sendack called");
+            SnakesProto.GameMessage.Builder gm = SnakesProto.GameMessage.newBuilder();
+            SnakesProto.GameMessage.AckMsg.Builder ack = SnakesProto.GameMessage.AckMsg.newBuilder();
+            gm.setAck(ack.build());
+            gm.setMsgSeq(message.getMsgSeq());
+            SnakesProto.GamePlayer.Builder p = SnakesProto.GamePlayer.newBuilder();
+            p.setId(0);
+            p.setName("");
+            p.setIpAddress(Controller.neededsenders.get(receiverId).ip);
+            p.setPort(Controller.neededsenders.get(receiverId).port);
+            p.setRole(SnakesProto.NodeRole.MASTER);
+            p.setScore(0);
+            NetworkWriter.sendError(gm.build(), p.build());
+        }
     }
     public static void sendRoleChange(SnakesProto.GameMessage.RoleChangeMsg msg, int id){
         if (id == -1){
@@ -224,12 +270,13 @@ public class Model {
         //TODO: make iteration synchronized
         Iterator<MessageCustom> iter = NetworkWriter.resend.iterator();
         while (iter.hasNext()) {
-            if (iter.next().gm.getMsgSeq() == gm.getMsgSeq()) {
+            MessageCustom messageCustom = iter.next();
+            if (messageCustom.gm.getMsgSeq() == gm.getMsgSeq()) {
                 //if ack on join - set playerId
                 Controller.playerId = gm.getReceiverId();
                 Controller.masterId = gm.getSenderId(); //??
                 //delete sender id from branches
-                iter.next().branches.remove(player);
+                messageCustom.branches.remove(player);
             }
         }
     }
@@ -266,6 +313,7 @@ public class Model {
             //find snake, set to !ALIVE, set new playerid (<0)
             if (Controller.getPlayer(id).getRole() != VIEWER) GameProcess.makeZombie(id);
             //delete from players
+            //GameProcess.deletePlayer(id);
             GameProcess.deletePlayer(id);
         }
         else {
