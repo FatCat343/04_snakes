@@ -92,22 +92,23 @@ public class NetworkWriter implements Runnable {
                     }
                     if (msg.branches.size() > 0) {
                         //TODO: check on importance of synchronization
-                        Iterator<SnakesProto.GamePlayer> iter = msg.branches.iterator();
-                        while (iter.hasNext()) {
-                            SnakesProto.GamePlayer player = iter.next();
-                            Sender sender = new Sender();
-                            sender.ip = player.getIpAddress();
-                            sender.port = player.getPort();
-                            if (!Controller.neededsenders.contains(sender)) {
-                                if (Model.state.getPlayers().getPlayersList().contains(player)) {
-                                    //if needed to be sent to MASTER, finds new MASTER
-                                    if (player.getRole().equals(SnakesProto.NodeRole.MASTER)) {
-                                        SnakesProto.GamePlayer master = Controller.getPlayer(Controller.masterId);
-                                        if (master != null) Network.send(msg.gm, master);
-                                    } else Network.send(msg.gm, player);
-                                } else iter.remove();
+                        synchronized (msg.branches) {
+                            Iterator<SnakesProto.GamePlayer> iter = msg.branches.iterator();
+                            while (iter.hasNext()) {
+                                SnakesProto.GamePlayer player = iter.next();
+                                Sender sender = new Sender();
+                                sender.ip = player.getIpAddress();
+                                sender.port = player.getPort();
+                                if (!Controller.neededsenders.contains(sender)) {
+                                    if (Model.state.getPlayers().getPlayersList().contains(player)) {
+                                        //if needed to be sent to MASTER, finds new MASTER
+                                        if (player.getRole().equals(SnakesProto.NodeRole.MASTER)) {
+                                            SnakesProto.GamePlayer master = Controller.getPlayer(Controller.masterId);
+                                            if (master != null) Network.send(msg.gm, master);
+                                        } else Network.send(msg.gm, player);
+                                    } else iter.remove();
+                                } else Network.send(msg.gm, player);
                             }
-                            else Network.send(msg.gm, player);
                         }
                         msg.sendtime = LocalTime.now();
                         resend.add(msg); //add to tail
@@ -121,16 +122,18 @@ public class NetworkWriter implements Runnable {
             }
             //check lastsent, if player is not in players - delete it, if localtime < now - 100ms -> send ping
             if (Model.state != null) {
-                //TODO: iteration synchronization
-                Iterator<Map.Entry<SnakesProto.GamePlayer, LocalTime>> it = lastSent.entrySet().iterator();
-                while (it.hasNext()) {
-                    Map.Entry<SnakesProto.GamePlayer, LocalTime> pair = it.next();
-                    if (!Model.state.getPlayers().getPlayersList().contains(pair.getKey())) {
-                        it.remove();
-                        continue;
-                    }
-                    if (pair.getValue().plusNanos(Model.config.getPingDelayMs() * 1000000).isBefore(LocalTime.now())) {
-                        send_ping(pair.getKey());
+                //TODO: iteration synchronization - v
+                synchronized (lastSent) {
+                    Iterator<Map.Entry<SnakesProto.GamePlayer, LocalTime>> it = lastSent.entrySet().iterator();
+                    while (it.hasNext()) {
+                        Map.Entry<SnakesProto.GamePlayer, LocalTime> pair = it.next();
+                        if (!Model.state.getPlayers().getPlayersList().contains(pair.getKey())) {
+                            it.remove();
+                            continue;
+                        }
+                        if (pair.getValue().plusNanos(Model.config.getPingDelayMs() * 1000000).isBefore(LocalTime.now())) {
+                            send_ping(pair.getKey());
+                        }
                     }
                 }
             }
@@ -189,19 +192,23 @@ public class NetworkWriter implements Runnable {
         mst.origtime = LocalTime.now();
         mst.sendtime = mst.origtime;
         //all messages in resend of message.type need to be updated
-        //TODO: make iteration synchronized
-        Iterator<MessageCustom> iter = resend.iterator();
-        while (iter.hasNext()) {
-            MessageCustom msg = iter.next();
-            if (msg.gm.getTypeCase() == message.getTypeCase()) resend.remove(msg);
+        //TODO: make iteration synchronized - v
+        synchronized (resend) {
+            Iterator<MessageCustom> iter = resend.iterator();
+            while (iter.hasNext()) {
+                MessageCustom msg = iter.next();
+                if (msg.gm.getTypeCase() == message.getTypeCase()) resend.remove(msg);
+            }
         }
         boolean res = resend.add(mst);
         if (invoketime == null) {
             invoketime = mst.origtime.plusNanos(Model.config.getPingDelayMs() * 1000000);
         }
         //TODO: make iteration synchronized
-        for (SnakesProto.GamePlayer gamePlayer : mst.branches) {
-            Network.send(message, gamePlayer);
+        synchronized (mst.branches) {
+            for (SnakesProto.GamePlayer gamePlayer : mst.branches) {
+                Network.send(message, gamePlayer);
+            }
         }
     }
     private void send_single(SnakesProto.GameMessage message){
@@ -216,13 +223,15 @@ public class NetworkWriter implements Runnable {
         mst.sendtime = mst.origtime;
         Network.send(message, player);
         //check if we have older message of same type to same receiver
-        //TODO: make iteration synchronized
-        Iterator<MessageCustom> iter = resend.iterator();
-        while (iter.hasNext()) {
-            MessageCustom msg = iter.next();
-            if ((msg.gm.getReceiverId() == message.getReceiverId()) && (msg.gm.getTypeCase() == message.getTypeCase())) {
-                resend.remove(msg);
-                break;
+        //TODO: make iteration synchronized - v
+        synchronized (resend) {
+            Iterator<MessageCustom> iter = resend.iterator();
+            while (iter.hasNext()) {
+                MessageCustom msg = iter.next();
+                if ((msg.gm.getReceiverId() == message.getReceiverId()) && (msg.gm.getTypeCase() == message.getTypeCase())) {
+                    resend.remove(msg);
+                    break;
+                }
             }
         }
         boolean res = resend.add(mst);
@@ -239,14 +248,16 @@ public class NetworkWriter implements Runnable {
             System.out.println("player == null");
             return;
         }
-        //TODO: make iteration synchronized
-        Iterator<Map.Entry<Sender, SnakesProto.GameMessage>> it = NetworkReader.received.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<Sender, SnakesProto.GameMessage> pair = it.next();
-            //checks if in pair sender = receiver in gm and if msg_id's are equal
-            if ((gm.getMsgSeq() == pair.getValue().getMsgSeq()) && (player.getIpAddress().equals(pair.getKey().ip)) && (player.getPort() == pair.getKey().port)) {
-                Network.send(gm, Objects.requireNonNull(Controller.getPlayer(gm.getReceiverId())));
-                break;
+        //TODO: make iteration synchronized - v
+        synchronized (NetworkReader.received) {
+            Iterator<Map.Entry<Sender, SnakesProto.GameMessage>> it = NetworkReader.received.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<Sender, SnakesProto.GameMessage> pair = it.next();
+                //checks if in pair sender = receiver in gm and if msg_id's are equal
+                if ((gm.getMsgSeq() == pair.getValue().getMsgSeq()) && (player.getIpAddress().equals(pair.getKey().ip)) && (player.getPort() == pair.getKey().port)) {
+                    Network.send(gm, Objects.requireNonNull(Controller.getPlayer(gm.getReceiverId())));
+                    break;
+                }
             }
         }
 

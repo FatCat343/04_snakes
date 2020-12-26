@@ -28,8 +28,8 @@ public class Network {
             //Object o = is.readObject();
             //is.close();
             SnakesProto.GameMessage msg = SnakesProto.GameMessage.parseFrom(Arrays.copyOf(packet.getData(), packet.getLength()));
-            //System.out.println("received msg with id = " + msg.getMsgSeq() + " from ip = " + sender.ip + " , port = " + sender.port
-                                //+ " of type = " + msg.getTypeCase());
+            System.out.println("received msg with id = " + msg.getMsgSeq() + " from ip = " + sender.ip + " , port = " + sender.port
+                                + " of type = " + msg.getTypeCase());
             return msg;
         }
         catch (IOException e) {
@@ -43,8 +43,8 @@ public class Network {
         try{
             byte[] sendBuf = msg.toByteArray();
             DatagramPacket packet = new DatagramPacket(sendBuf, sendBuf.length, InetAddress.getByName(receiver.getIpAddress()), receiver.getPort());
-            //System.out.println("sends msg with id = " + msg.getMsgSeq() + " to addr = " + receiver.getIpAddress() +
-                               // " to port = " + receiver.getPort() + "of type = " + msg.getTypeCase());
+            System.out.println("sends msg with id = " + msg.getMsgSeq() + " to addr = " + receiver.getIpAddress() +
+                                " to port = " + receiver.getPort() + "of type = " + msg.getTypeCase());
             Model.socket.send(packet);
             //TODO: make sync iter
             NetworkWriter.lastSent.put(receiver, LocalTime.now());
@@ -57,8 +57,8 @@ public class Network {
         try{
             byte[] sendBuf = msg.toByteArray();
             DatagramPacket packet = new DatagramPacket(sendBuf, sendBuf.length, InetAddress.getByName(receiver.ip), receiver.port);
-            //System.out.println("sends msg with id = " + msg.getMsgSeq() + " to addr = " + receiver.ip +
-             //       " to port = " + receiver.port + "of type = " + msg.getTypeCase());
+            System.out.println("sends msg with id = " + msg.getMsgSeq() + " to addr = " + receiver.ip +
+                    " to port = " + receiver.port + "of type = " + msg.getTypeCase());
             Model.socket.send(packet);
             //TODO: make sync iter
             //NetworkWriter.lastSent.put(receiver, LocalTime.now());

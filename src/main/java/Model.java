@@ -103,7 +103,7 @@ public class Model {
 
     }
     public synchronized static int getMsgId(){
-        //TODO: sync
+        //TODO: sync - v
             msgNum++;
 
         return msgNum;
@@ -120,39 +120,43 @@ public class Model {
     public static void error(SnakesProto.GameMessage gm, SnakesProto.GamePlayer player){
         //exit();
         GUI.error(gm.getError().getErrorMessage());
-        //TODO: make iteration synchronized
-        Iterator<MessageCustom> iter = NetworkWriter.resend.iterator();
-        while (iter.hasNext()) {
-            if (iter.next().gm.getMsgSeq() == gm.getMsgSeq()) {
-                //if ack on join - set playerId
-                Controller.playerId = gm.getReceiverId();
-                Controller.masterId = gm.getSenderId(); //??
-                //delete sender id from branches
-                iter.next().branches.remove(player);
+        //TODO: make iteration synchronized - v
+        synchronized (NetworkWriter.resend) {
+            Iterator<MessageCustom> iter = NetworkWriter.resend.iterator();
+            while (iter.hasNext()) {
+                if (iter.next().gm.getMsgSeq() == gm.getMsgSeq()) {
+                    //if ack on join - set playerId
+                    Controller.playerId = gm.getReceiverId();
+                    Controller.masterId = gm.getSenderId(); //??
+                    //delete sender id from branches
+                    iter.next().branches.remove(player);
+                }
             }
         }
     }
     public static void setState(SnakesProto.GameState state1){
-        //TODO : sync
+        //TODO : sync - state could be null
         state = state1;
         //update controller.players
         GUI.repaint(state, GameListReceiver.table);
     }
 
     public static void setState(SnakesProto.GameState state1, Sender sender){
-        //TODO : sync
-        state = state1;
-        SnakesProto.GameState.Builder newstate = SnakesProto.GameState.newBuilder(state1);
-        SnakesProto.GamePlayers.Builder players = SnakesProto.GamePlayers.newBuilder(state.getPlayers());
-        int masterId = Controller.findRole(MASTER);
-        Controller.masterId = masterId;
-        Controller.role = Controller.getRole(Controller.playerId);
-        SnakesProto.GamePlayer.Builder master = SnakesProto.GamePlayer.newBuilder(players.getPlayers(masterId));
-        master.setIpAddress(sender.ip);
-        master.setPort(sender.port);
-        players.setPlayers(masterId, master.build());
-        newstate.setPlayers(players.build());
-        state = newstate.build();
+        //TODO : sync - state could b null
+        //synchronized (state) {
+            state = state1;
+            SnakesProto.GameState.Builder newstate = SnakesProto.GameState.newBuilder(state1);
+            SnakesProto.GamePlayers.Builder players = SnakesProto.GamePlayers.newBuilder(state.getPlayers());
+            int masterId = Controller.findRole(MASTER);
+            Controller.masterId = masterId;
+            Controller.role = Controller.getRole(Controller.playerId);
+            SnakesProto.GamePlayer.Builder master = SnakesProto.GamePlayer.newBuilder(players.getPlayers(masterId));
+            master.setIpAddress(sender.ip);
+            master.setPort(sender.port);
+            players.setPlayers(masterId, master.build());
+            newstate.setPlayers(players.build());
+            state = newstate.build();
+       // }
         //update controller.players
         GUI.repaint(state, GameListReceiver.table);
     }
@@ -267,16 +271,18 @@ public class Model {
         }
     }
     public static void getAck(SnakesProto.GameMessage gm, SnakesProto.GamePlayer player){
-        //TODO: make iteration synchronized
-        Iterator<MessageCustom> iter = NetworkWriter.resend.iterator();
-        while (iter.hasNext()) {
-            MessageCustom messageCustom = iter.next();
-            if (messageCustom.gm.getMsgSeq() == gm.getMsgSeq()) {
-                //if ack on join - set playerId
-                Controller.playerId = gm.getReceiverId();
-                Controller.masterId = gm.getSenderId(); //??
-                //delete sender id from branches
-                messageCustom.branches.remove(player);
+        //TODO: make iteration synchronized - V
+        synchronized (NetworkWriter.resend) {
+            Iterator<MessageCustom> iter = NetworkWriter.resend.iterator();
+            while (iter.hasNext()) {
+                MessageCustom messageCustom = iter.next();
+                if (messageCustom.gm.getMsgSeq() == gm.getMsgSeq()) {
+                    //if ack on join - set playerId
+                    Controller.playerId = gm.getReceiverId();
+                    Controller.masterId = gm.getSenderId(); //??
+                    //delete sender id from branches
+                    messageCustom.branches.remove(player);
+                }
             }
         }
     }

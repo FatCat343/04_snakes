@@ -27,12 +27,14 @@ public class NetworkReader implements Runnable{
             //System.out.println("sender ip = " + sender.ip);
             int alreadyReceived = 0;
             //TODO: make iteration synchronised
-            for (Map.Entry<Sender, SnakesProto.GameMessage> pair : received.entrySet()) {
-                SnakesProto.GameMessage message = pair.getValue();
-                Sender sender1 = pair.getKey();
-                if ((message.getMsgSeq() == gm.getMsgSeq()) && (sender1.equals(sender))) {
-                    alreadyReceived = 1;
-                    break;
+            synchronized (received) {
+                for (Map.Entry<Sender, SnakesProto.GameMessage> pair : received.entrySet()) {
+                    SnakesProto.GameMessage message = pair.getValue();
+                    Sender sender1 = pair.getKey();
+                    if ((message.getMsgSeq() == gm.getMsgSeq()) && (sender1.equals(sender))) {
+                        alreadyReceived = 1;
+                        break;
+                    }
                 }
             }
             if (alreadyReceived == 1) {
@@ -58,7 +60,10 @@ public class NetworkReader implements Runnable{
 
             //check whether we have msg of same type from same sender
             //TODO: make iteration synchronised
-            received.entrySet().removeIf(pair -> ((pair.getKey().equals(sender)) && (pair.getValue().getTypeCase().equals(gm.getTypeCase()))));
+            synchronized (received) {
+                received.entrySet().removeIf(pair ->
+                        ((pair.getKey().equals(sender)) && (pair.getValue().getTypeCase().equals(gm.getTypeCase()))));
+            }
             //now we dont have msg of same type from same sender
             received.put(sender, gm);
             switch (gm.getTypeCase()) {
