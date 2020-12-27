@@ -31,7 +31,9 @@ public class NetworkReader implements Runnable{
                 for (Map.Entry<Sender, SnakesProto.GameMessage> pair : received.entrySet()) {
                     SnakesProto.GameMessage message = pair.getValue();
                     Sender sender1 = pair.getKey();
-                    if ((message.getMsgSeq() == gm.getMsgSeq()) && (sender1.equals(sender))) {
+                    if ((message.getMsgSeq() == gm.getMsgSeq())
+                            && (message.getTypeCase().equals(gm.getTypeCase()))
+                            && (sender1.equals(sender))) {
                         alreadyReceived = 1;
                         break;
                     }
