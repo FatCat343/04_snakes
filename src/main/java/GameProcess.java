@@ -64,7 +64,7 @@ public class GameProcess implements Runnable {
 
     public void run() {
         System.out.println("starts run");
-        while(running) {
+        while(true) {
             try {
                 sleep(2000);
                 System.out.println("do turn");
@@ -81,8 +81,8 @@ public class GameProcess implements Runnable {
             }
             else System.out.println("stops working");
         }
-        System.out.println("finished");
-        finished = true;
+        //System.out.println("finished");
+        //finished = true;
     }
     public static void start() {
         t = new Thread(new GameProcess());
@@ -100,7 +100,8 @@ public class GameProcess implements Runnable {
         running = false;
     }
     public static void continueGame(SnakesProto.GameState state){
-        Thread t = new Thread(new GameProcess(state));
+        //Thread t = new Thread(new GameProcess(state));
+        gameState = SnakesProto.GameState.newBuilder(state);
         int count = 0;
         List<SnakesProto.GamePlayer> playerList = state.getPlayers().getPlayersList();
         for (int i = 0; i < playerList.size(); i++) {
@@ -110,7 +111,7 @@ public class GameProcess implements Runnable {
         }
         aliveSnakes = count;
         running = true;
-        t.start();
+        //t.start();
     }
     public static void changeState(int id, SnakesProto.NodeRole role){
         //TODO: sync
@@ -222,7 +223,8 @@ public class GameProcess implements Runnable {
             p.setName(gm.getJoin().getName());
             p.setIpAddress(sender.ip);
             p.setPort(sender.port);
-            p.setRole(SnakesProto.NodeRole.NORMAL);
+            if (gameState.getPlayers().getPlayersCount() == 1) p.setRole(SnakesProto.NodeRole.DEPUTY);
+            else p.setRole(SnakesProto.NodeRole.DEPUTY);
             p.setScore(0);
 
             gameState.addSnakes(res);
