@@ -20,7 +20,7 @@ public class Controller {
     public static SnakesProto.NodeRole role = VIEWER;
     public static List<Sender> neededsenders = new ArrayList<>();
     public static void main(String[] args) {
-        parse("config.txt");
+        //parse("config.txt");
         name = args[0];
         port = Integer.parseInt(args[1]);
         //Model.Init(); // инициализирует необходимые структуры
@@ -36,13 +36,14 @@ public class Controller {
         //TODO: make change synchronized
         //players = gm.getState().getState().getPlayers().getPlayersList();
         if (neededsenders.size() > 0) Controller.neededsenders.remove(0);
-        Model.setState(gm.getState().getState(), sender);
+        if (Model.state != null && Model.state.getStateOrder() > gm.getState().getState().getStateOrder()) ;
+        else Model.setState(gm.getState().getState(), sender);
         Model.sendAck(gm, getId(sender));
     }
 
-    public static void parse(String filename){ //parse config file to get params
-
-    }
+//    public static void parse(String filename){ //parse config file to get params
+//
+//    }
     public static void connect(Sender sender){
         exit();
         Model.state = null;

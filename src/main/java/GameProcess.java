@@ -31,7 +31,7 @@ public class GameProcess implements Runnable {
         if (res != null) {
             //can be added, snake already placed + configured (or not)
             SnakesProto.GamePlayer.Builder p = SnakesProto.GamePlayer.newBuilder();
-
+            aliveSnakes++;
             p.setId(res.getPlayerId());
             p.setName(Controller.name);
             p.setIpAddress("1.1.1.1");
@@ -217,6 +217,7 @@ public class GameProcess implements Runnable {
         if (res != null) {
             //can be added, snake already placed + configured
             System.out.println("can join player");
+            aliveSnakes++;
             SnakesProto.GamePlayer.Builder p = SnakesProto.GamePlayer.newBuilder();
 
             p.setId(res.getPlayerId());
@@ -245,7 +246,6 @@ public class GameProcess implements Runnable {
     }
     //finds snake + places it
     public static SnakesProto.GameState.Snake findPlace(int id){
-        aliveSnakes++;
         ConcurrentHashMap<SnakesProto.GameState.Coord, Integer> used_checks = new ConcurrentHashMap<>();
         //TODO: sync iteration
         synchronized (gameState) {

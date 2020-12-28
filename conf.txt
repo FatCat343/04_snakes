@@ -1,0 +1,8 @@
+width 40
+height 30
+food_static 1
+food_per_player 1
+state_delay_ms 1000
+dead_food_prob 0.1
+ping_delay_ms 100
+node_timeout_ms 800

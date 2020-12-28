@@ -2,10 +2,15 @@ import com.google.protobuf.AbstractMessage;
 import com.google.protobuf.Message;
 import me.ippolitov.fit.snakes.SnakesProto;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.DatagramSocket;
 import java.net.SocketException;
 import java.sql.Connection;
 import java.util.Iterator;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static me.ippolitov.fit.snakes.SnakesProto.NodeRole.*;
@@ -24,7 +29,7 @@ public class Model {
     public static void Init(){
         try {
             socket = new DatagramSocket(Controller.port);
-            parse("config.txt");
+            parse("conf.txt");
             GameListReceiver.start();
             ///
             GUI.init(config); //set params in init
@@ -61,8 +66,46 @@ public class Model {
 
     public static void parse(String filename){ //parse config file to get params
         SnakesProto.GameConfig.Builder tmp = SnakesProto.GameConfig.newBuilder();
-        tmp.setHeight(20);
-        tmp.setWidth(20);
+
+        BufferedReader reader;
+        try {
+            reader = new BufferedReader(new FileReader(filename));
+            String line = reader.readLine();
+            while (line != null) {
+                System.out.println(line);
+                String key = line.split(" ")[0];
+                String value = line.split(" ")[1];
+                if (key.equals("width")) {
+                    tmp.setWidth(Integer.parseInt(value));
+                }
+                if (key.equals("height")) {
+                    tmp.setHeight(Integer.parseInt(value));
+                }
+                if (key.equals("food_static")) {
+                    tmp.setFoodStatic(Integer.parseInt(value));
+                }
+                if (key.equals("food_per_player")) {
+                    tmp.setFoodPerPlayer(Float.parseFloat(value));
+                }
+                if (key.equals("state_delay_ms")) {
+                    tmp.setStateDelayMs(Integer.parseInt(value));
+                }
+                if (key.equals("dead_food_prob")) {
+                    tmp.setDeadFoodProb(Float.parseFloat(value));
+                }
+                if (key.equals("ping_delay_ms")) {
+                    tmp.setPingDelayMs(Integer.parseInt(value));
+                }
+                if (key.equals("node_timeout_ms")) {
+                    tmp.setNodeTimeoutMs(Integer.parseInt(value));
+                }
+                // read next line
+                line = reader.readLine();
+            }
+            reader.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
         config = tmp.build();
     }
