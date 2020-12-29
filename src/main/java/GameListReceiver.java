@@ -75,7 +75,7 @@ public class GameListReceiver implements Runnable {
             if (j < msg.getAnnouncement().getPlayers().getPlayersList().size()) {
                 sender.ip = packet.getAddress().toString().split("/")[1];
                 sender.port = msg.getAnnouncement().getPlayers().getPlayers(j).getPort();
-                //System.out.println("received packet from ip = " + sender.ip + "  port = " + sender.port);
+                System.out.println("received packet from ip = " + sender.ip + "  port = " + sender.port);
 
                 UpdateTable(msg.getAnnouncement(), sender);
             }

@@ -5,6 +5,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 import static java.time.temporal.ChronoUnit.SECONDS;
+import static me.ippolitov.fit.snakes.SnakesProto.NodeRole.MASTER;
 
 public class NetworkWriter implements Runnable {
     //waits on message queue or invokes to resend message
@@ -71,14 +72,10 @@ public class NetworkWriter implements Runnable {
                 System.out.println("polling was interrupted");
                 e.printStackTrace();
             }
-            //TODO : changed seconds.between() on correct func ->isBefore, check
             while ((invoketime != null) && invoketime.isBefore(LocalTime.now())) {
                 //resends oldest message
-                //TODO: change resend to send old msg to new MASTER
                 MessageCustom msg = resend.poll(); //was id
                 if (msg != null){
-                    //TODO: change seconds.between - check
-                    //TODO: add special rules to resend error messages (shouldn't compare receiver to players)
                     //timeout for message
                     if (msg.origtime.plusNanos(Model.config.getNodeTimeoutMs() * 1000000).isBefore(LocalTime.now())) {
                         deleteclients(msg.branches);
@@ -91,7 +88,6 @@ public class NetworkWriter implements Runnable {
                         continue;
                     }
                     if (msg.branches.size() > 0) {
-                        //TODO: check on importance of synchronization
                         synchronized (msg.branches) {
                             Iterator<SnakesProto.GamePlayer> iter = msg.branches.iterator();
                             while (iter.hasNext()) {
@@ -104,7 +100,7 @@ public class NetworkWriter implements Runnable {
                                         //if needed to be sent to MASTER, finds new MASTER
                                         if (player.getRole().equals(SnakesProto.NodeRole.MASTER)) {
                                             SnakesProto.GamePlayer master = Controller.getPlayer(Controller.masterId);
-                                            if (master != null) Network.send(msg.gm, master);
+                                            if (master != null && Controller.role != MASTER) Network.send(msg.gm, master);
                                         } else Network.send(msg.gm, player);
                                     } else iter.remove();
                                 } else Network.send(msg.gm, player);
@@ -122,7 +118,6 @@ public class NetworkWriter implements Runnable {
             }
             //check lastsent, if player is not in players - delete it, if localtime < now - 100ms -> send ping
             if (Model.state != null) {
-                //TODO: iteration synchronization - v
                 synchronized (lastSent) {
                     Iterator<Map.Entry<SnakesProto.GamePlayer, LocalTime>> it = lastSent.entrySet().iterator();
                     while (it.hasNext()) {
@@ -148,7 +143,6 @@ public class NetworkWriter implements Runnable {
         send_single(gm.build());
     }
     public static void sendError(SnakesProto.GameMessage message, SnakesProto.GamePlayer receiver){
-        //TODO: ?????????
         //System.out.println("sends error to " + receiver.getIpAddress()+":"+receiver.getPort());
         MessageCustom mst = new MessageCustom();
         mst.gm = message;
@@ -158,7 +152,6 @@ public class NetworkWriter implements Runnable {
         mst.sendtime = mst.origtime;
         Network.send(message, receiver);
         //check if we have older message of same type to same receiver
-        //TODO: make iteration synchronized - do we need it here?
         Iterator<MessageCustom> iter = resend.iterator();
         while (iter.hasNext()) {
             MessageCustom msg = iter.next();
@@ -182,9 +175,7 @@ public class NetworkWriter implements Runnable {
         //System.out.println("sends message to all");
         MessageCustom mst = new MessageCustom();
         mst.gm = message;
-        //TODO : check if conroller.players changes between init of branches and iteration(client leaves or comes)
         mst.branches = new ArrayList<>(Model.state.getPlayers().getPlayersList());
-        //TODO: mb sync branches iteration
         //our gameplayer, not resend to ourself
         //System.out.println("our playerid = " + Controller.playerId);
         mst.branches.removeIf(pl -> pl.getId() == Controller.playerId);
@@ -192,7 +183,6 @@ public class NetworkWriter implements Runnable {
         mst.origtime = LocalTime.now();
         mst.sendtime = mst.origtime;
         //all messages in resend of message.type need to be updated
-        //TODO: make iteration synchronized - v
         synchronized (resend) {
             Iterator<MessageCustom> iter = resend.iterator();
             while (iter.hasNext()) {
@@ -204,7 +194,6 @@ public class NetworkWriter implements Runnable {
         if (invoketime == null) {
             invoketime = mst.origtime.plusNanos(Model.config.getPingDelayMs() * 1000000);
         }
-        //TODO: make iteration synchronized
         synchronized (mst.branches) {
             for (SnakesProto.GamePlayer gamePlayer : mst.branches) {
                 Network.send(message, gamePlayer);
@@ -223,7 +212,6 @@ public class NetworkWriter implements Runnable {
         mst.sendtime = mst.origtime;
         Network.send(message, player);
         //check if we have older message of same type to same receiver
-        //TODO: make iteration synchronized - v
         synchronized (resend) {
             Iterator<MessageCustom> iter = resend.iterator();
             while (iter.hasNext()) {
@@ -248,7 +236,6 @@ public class NetworkWriter implements Runnable {
             System.out.println("player == null");
             return;
         }
-        //TODO: make iteration synchronized - v
         synchronized (NetworkReader.received) {
             Iterator<Map.Entry<Sender, SnakesProto.GameMessage>> it = NetworkReader.received.entrySet().iterator();
             while (it.hasNext()) {
@@ -265,7 +252,6 @@ public class NetworkWriter implements Runnable {
     public void deleteclients(List<SnakesProto.GamePlayer> clients){
         System.out.println("delete clients called");
         if (Model.state != null) {
-            //TODO: check on importance of synchronization
             Iterator<SnakesProto.GamePlayer> it = clients.iterator();
             while (it.hasNext()) {
                 //works with up-to-date player
@@ -273,15 +259,24 @@ public class NetworkWriter implements Runnable {
                 SnakesProto.GamePlayer player = Controller.getPlayer(pl.getId());
                 if (player == null) continue;
                 //Model.state.getPlayers().getPlayersList().remove(player);
-                Model.disconnect(player.getId());
                 //we are normal, delete master
+                Model.disconnect(player.getId());
                 if ((player.getRole().equals(SnakesProto.NodeRole.MASTER)) && (Objects.equals(Controller.getRole(Controller.playerId), SnakesProto.NodeRole.NORMAL))) {
                     Controller.changeMaster();
                     continue;
                 }
                 //we are deputy, delete master
                 if ((player.getRole().equals(SnakesProto.NodeRole.MASTER)) && (Objects.equals(Controller.getRole(Controller.playerId), SnakesProto.NodeRole.DEPUTY))) {
+                    //Controller.role = SnakesProto.NodeRole.MASTER;
                     Controller.becomeMaster();
+                    //Model.disconnect(player.getId());
+//                    Model.continueGame();
+//                    Model.disconnect(player.getId());
+//                    Controller.findDeputy();
+//                    //send rolechange msg
+//                    SnakesProto.GameMessage.RoleChangeMsg.Builder msg = SnakesProto.GameMessage.RoleChangeMsg.newBuilder();
+//                    msg.setSenderRole(MASTER);
+//                    Model.sendRoleChange(msg.build(), -1);
                     continue;
                 }
                 //we are master, delete deputy
@@ -289,6 +284,7 @@ public class NetworkWriter implements Runnable {
                     Controller.findDeputy();
                     //continue;
                 }
+
             }
         }
     }

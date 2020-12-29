@@ -41,7 +41,9 @@ public class Model {
         }
     }
     public static void continueGame(){
+        GameListSender.running = true;
         GameProcess.continueGame(state);
+
     }
 
 
@@ -51,6 +53,7 @@ public class Model {
             exit();
             new GameProcess();
             //GameProcess.restart();
+            GameListSender.running = true;
             GameProcess.restart();
             Controller.playerId = 0;
             Controller.masterId = 0;
@@ -114,26 +117,26 @@ public class Model {
 //    }
     public static void exit() {
         //send changeState to viewer
-        if (Controller.playerId == Controller.masterId){
+        if (Controller.role == MASTER){
             //stop game -->give it to deputy
             GameProcess.running = false;
             GameListSender.running = false;
             GameProcess.stop();
             //GameProcess.changeState(Controller.playerId, VIEWER);
 
-            if (Controller.findRole(DEPUTY) < 0){
-                Controller.findDeputy();
-            }
-            int dest = Controller.findRole(DEPUTY);
-            if (dest < 0){
-                //no players left
-            }
-            else {
-                SnakesProto.GameMessage.RoleChangeMsg.Builder msg = SnakesProto.GameMessage.RoleChangeMsg.newBuilder();
-                msg.setSenderRole(VIEWER);
-                msg.setReceiverRole(MASTER);
-                Model.sendRoleChange(msg.build(), Controller.masterId);
-            }
+//            if (Controller.findRole(DEPUTY) < 0){
+//                Controller.findDeputy();
+//            }
+//            int dest = Controller.findRole(DEPUTY);
+//            if (dest < 0){
+//                //no players left
+//            }
+//            else {
+//                SnakesProto.GameMessage.RoleChangeMsg.Builder msg = SnakesProto.GameMessage.RoleChangeMsg.newBuilder();
+//                msg.setSenderRole(VIEWER);
+//                msg.setReceiverRole(MASTER);
+//                Model.sendRoleChange(msg.build(), Controller.masterId);
+//            }
         }
         else {
             //exit as player --> send VIEWER rolechange
@@ -146,9 +149,7 @@ public class Model {
 
     }
     public synchronized static int getMsgId(){
-        //TODO: sync - v
-            msgNum++;
-
+        msgNum++;
         return msgNum;
     }
     public static void join(SnakesProto.GameMessage gm, Sender sender){
@@ -163,7 +164,6 @@ public class Model {
     public static void error(SnakesProto.GameMessage gm, SnakesProto.GamePlayer player){
         //exit();
         GUI.error(gm.getError().getErrorMessage());
-        //TODO: make iteration synchronized - v
         synchronized (NetworkWriter.resend) {
             Iterator<MessageCustom> iter = NetworkWriter.resend.iterator();
             while (iter.hasNext()) {
@@ -178,14 +178,12 @@ public class Model {
         }
     }
     public static void setState(SnakesProto.GameState state1){
-        //TODO : sync - state could be null
         state = state1;
         //update controller.players
         GUI.repaint(state, GameListReceiver.table);
     }
 
     public static void setState(SnakesProto.GameState state1, Sender sender){
-        //TODO : sync - state could b null
         //synchronized (state) {
             state = state1;
             SnakesProto.GameState.Builder newstate = SnakesProto.GameState.newBuilder(state1);
@@ -197,6 +195,7 @@ public class Model {
             master.setIpAddress(sender.ip);
             master.setPort(sender.port);
             players.setPlayers(masterId, master.build());
+            System.out.println("new master player = " + master.build());
             newstate.setPlayers(players.build());
             state = newstate.build();
        // }
@@ -330,7 +329,6 @@ public class Model {
         }
     }
     public static void makeViewer(int id){
-        //TODO: sync
         //player needs become viewer
         if (id != Controller.playerId){
             //another player become Viewer -> change his role (mb set snake to !ALIVE)

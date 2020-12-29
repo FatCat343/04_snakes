@@ -229,6 +229,7 @@ public class Controller {
             SnakesProto.GamePlayer player = iter.next();
             if (player.getRole().equals(SnakesProto.NodeRole.NORMAL)) {
                 Model.setDeputy(player.getId());
+                System.out.println("find deputy");
                 break;
             }
         }
@@ -246,7 +247,11 @@ public class Controller {
     }
     public static void becomeMaster(){
         //взять управление игрой
+        System.out.println("become master called");
+        Controller.role = MASTER;
+        Controller.masterId = Controller.playerId;
         Model.continueGame();
+        GameProcess.changeState(masterId, MASTER);
         findDeputy();
         //send rolechange msg
         SnakesProto.GameMessage.RoleChangeMsg.Builder msg = SnakesProto.GameMessage.RoleChangeMsg.newBuilder();

@@ -109,12 +109,12 @@ public class GameProcess implements Runnable {
                 count++;
             }
         }
+
         aliveSnakes = count;
         running = true;
         //t.start();
     }
     public static void changeState(int id, SnakesProto.NodeRole role){
-        //TODO: sync
         synchronized (gameState) {
             List<SnakesProto.GamePlayer> playerList = gameState.getPlayers().getPlayersList();
             for (int i = 0; i < playerList.size(); i++) {
@@ -163,7 +163,6 @@ public class GameProcess implements Runnable {
         }
     }
     public static void makeZombie(int playerId){
-        //TODO: sync
         synchronized (gameState) {
             List<SnakesProto.GameState.Snake> snakesList = gameState.getSnakesList();
             for (int i = 0; i < snakesList.size(); i++) {
@@ -171,15 +170,15 @@ public class GameProcess implements Runnable {
                     SnakesProto.GameState.Snake.Builder snake = SnakesProto.GameState.Snake.newBuilder(snakesList.get(i));
                     snake.setState(SnakesProto.GameState.Snake.SnakeState.ZOMBIE);
                     snake.setPlayerId(newZombieSnakeid());
+                    gameState.setSnakes(i, snake);
+                    aliveSnakes--;
                     break;
                 }
             }
         }
-        aliveSnakes--;
         Model.setState(gameState.build());
     }
     public static void deletePlayer(int playerId){
-        //TODO: sync
         synchronized (gameState) {
             //gameState.getPlayers().getPlayersList().remove(playerId);
             SnakesProto.GamePlayers.Builder players = SnakesProto.GamePlayers.newBuilder(gameState.getPlayers());
@@ -258,6 +257,7 @@ public class GameProcess implements Runnable {
                 Iterator<SnakesProto.GameState.Coord> it = snakeBody.iterator();
                 SnakesProto.GameState.Coord prev = snakeBody.get(0);
                 //SnakesProto.GameState.Coord tail = snakeBody.get(0);
+                SnakesProto.GameState.Coord.Builder tmp = SnakesProto.GameState.Coord.newBuilder();
                 while (it.hasNext()) {
                     SnakesProto.GameState.Coord coord = it.next();
                     if (i != 0) {
@@ -266,40 +266,46 @@ public class GameProcess implements Runnable {
                             if (coord.getX() < 0) {
                                 step = -1;
                             } else step = 1;
-                            for (int j = prev.getX(); j != coord.getX(); j = (j + step) % Model.config.getWidth()) {
-                                SnakesProto.GameState.Coord.Builder tmp = SnakesProto.GameState.Coord.newBuilder();
+                            for (int j = prev.getX();
+                                 j != (Model.config.getWidth() + coord.getX() + prev.getX()) % Model.config.getWidth();
+                                 j = (Model.config.getWidth() + j + step) % Model.config.getWidth()) {
+
                                 tmp.setY(coord.getY());
                                 tmp.setX(j);
                                 //tail = tmp.build();
                                 used_checks.put(tmp.build(), snake.getPlayerId());
-                                if (coord.getY() == (j + step) % Model.config.getWidth()) {
-                                    tmp.setX(coord.getX());
-                                    tmp.setY(coord.getY());
-                                    tmp.build();
-                                    //tail = tmp.build();
-                                    used_checks.put(tmp.build(), snake.getPlayerId());
-                                }
+//                                if (coord.getX() == (j + step) % Model.config.getWidth()) {
+//                                    tmp.setX(coord.getX());
+//                                    tmp.setY(coord.getY());
+//                                    tmp.build();
+//                                    //tail = tmp.build();
+//                                    used_checks.put(tmp.build(), snake.getPlayerId());
+//                                }
                             }
+                            tmp.setX((Model.config.getWidth() + coord.getX() + prev.getX()) % Model.config.getWidth());
+                            used_checks.put(tmp.build(), snake.getPlayerId());
                         } else { //y!=0
                             int step;
                             if (coord.getY() < 0) {
                                 step = -1;
                             } else step = 1;
-                            for (int j = prev.getY(); j != coord.getY(); j = (j + step) % Model.config.getHeight()) {
-                                SnakesProto.GameState.Coord.Builder tmp = SnakesProto.GameState.Coord.newBuilder();
+                            for (int j = prev.getY();
+                                 j != (Model.config.getHeight() + coord.getY() + prev.getY()) % Model.config.getHeight();
+                                 j = (Model.config.getHeight() + j + step) % Model.config.getHeight()) {
+                                //SnakesProto.GameState.Coord.Builder tmp = SnakesProto.GameState.Coord.newBuilder();
                                 tmp.setX(coord.getX());
                                 tmp.setY(j);
-                                tmp.build();
-                                //tail = tmp.build();
                                 used_checks.put(tmp.build(), snake.getPlayerId());
-                                if (coord.getY() == (j + step) % Model.config.getHeight()) {
-                                    tmp.setX(coord.getX());
-                                    tmp.setY(coord.getY());
-                                    tmp.build();
-                                    //tail = tmp.build();
-                                    used_checks.put(tmp.build(), snake.getPlayerId());
-                                }
+//                                if (coord.getY() == (j + step) % Model.config.getHeight()) {
+//                                    tmp.setX(coord.getX());
+//                                    tmp.setY(coord.getY());
+//                                    tmp.build();
+//                                    //tail = tmp.build();
+//                                    used_checks.put(tmp.build(), snake.getPlayerId());
+//                                }
                             }
+                            tmp.setY((Model.config.getHeight() + coord.getY() + prev.getY()) % Model.config.getHeight());
+                            used_checks.put(tmp.build(), snake.getPlayerId());
                         }
                         prev = coord;
                     }

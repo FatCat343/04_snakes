@@ -90,7 +90,7 @@ public class GUI {
 //        CreateButtons();
 //    }
     public static void repaint(SnakesProto.GameState state, ConcurrentHashMap<Sender, SnakesProto.GameMessage.AnnouncementMsg> table){
-        //System.out.println(state);
+        System.out.println(state);
         ox = state.getConfig().getWidth();
         oy = state.getConfig().getHeight();
         RepaintField(state.getSnakesList(), state.getFoodsList());

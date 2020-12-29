@@ -23,6 +23,7 @@ public class GameListSender implements Runnable {
             byte[] sendBuf = msg.toByteArray();
             DatagramPacket packet = new DatagramPacket(sendBuf, sendBuf.length, group, port);
             //System.out.println("sends " + type + " with id = " + id + " to addr = " + cld.addr + " to port = " + cld.port);
+            System.out.println("sends UDP");
             socket.send(packet);
 
         }
@@ -38,11 +39,11 @@ public class GameListSender implements Runnable {
             SnakesProto.GameMessage.Builder msg = SnakesProto.GameMessage.newBuilder();
             SnakesProto.GameMessage.AnnouncementMsg.Builder ann = SnakesProto.GameMessage.AnnouncementMsg.newBuilder();
             ann.setConfig(Model.config);
-            while (running) {
+            while (true) {
                 ann.setPlayers(Model.state.getPlayers());
                 msg.setAnnouncement(ann.build());
                 msg.setMsgSeq(Model.getMsgId());
-                sendUDPMessage(msg.build(), "239.192.0.4", 9192, socket);
+                if (running) sendUDPMessage(msg.build(), "239.192.0.4", 9192, socket);
                 try {
                     sleep(1000);
                 } catch (InterruptedException e) {
