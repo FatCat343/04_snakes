@@ -10,7 +10,7 @@ import static java.lang.Thread.sleep;
 import static me.ippolitov.fit.snakes.SnakesProto.Direction.*;
 
 public class GameProcess implements Runnable {
-    public static ConcurrentHashMap<Integer, SnakesProto.Direction> steers = new ConcurrentHashMap<>();
+    public static ConcurrentHashMap<Integer, SnakesProto.Direction> steers;
     public static SnakesProto.GameState.Builder gameState;
     public static int aliveSnakes;
     public static Thread t;
@@ -21,6 +21,7 @@ public class GameProcess implements Runnable {
         running = true;
         finished = false;
         gameState = SnakesProto.GameState.newBuilder();
+        steers = new ConcurrentHashMap<>();
         gameState.setConfig(Model.config);
         gameState.setStateOrder(getStateOrder());
         Controller.playerId = 0;
@@ -57,10 +58,10 @@ public class GameProcess implements Runnable {
             Model.exit();
         }
     }
-    GameProcess(SnakesProto.GameState state){
-        gameState = SnakesProto.GameState.newBuilder(state);
-        Controller.findDeputy();
-    }
+//    GameProcess(SnakesProto.GameState state){
+//        gameState = SnakesProto.GameState.newBuilder(state);
+//        Controller.findDeputy();
+//    }
 
     public void run() {
         System.out.println("starts run");
@@ -224,7 +225,9 @@ public class GameProcess implements Runnable {
             p.setName(gm.getJoin().getName());
             p.setIpAddress(sender.ip);
             p.setPort(sender.port);
-            if (gameState.getPlayers().getPlayersCount() == 1) p.setRole(SnakesProto.NodeRole.DEPUTY);
+//            if (gameState.getPlayers().getPlayersCount() == 1) p.setRole(SnakesProto.NodeRole.DEPUTY);
+//            else p.setRole(SnakesProto.NodeRole.NORMAL);
+            if (Controller.findRole(SnakesProto.NodeRole.DEPUTY) >= 0) p.setRole(SnakesProto.NodeRole.NORMAL);
             else p.setRole(SnakesProto.NodeRole.DEPUTY);
             p.setScore(0);
 
