@@ -93,7 +93,6 @@ public class GUI {
     }
     private static void CreateField() { //adds field to window
         gameField = new JPanel();
-        //TODO: change 5 to ox, oy
         gameField.setLayout(new GridLayout(oy, oy));
         buttonList = new HashMap<>();
         for (int i = 0; i < ox*oy; i++){

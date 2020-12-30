@@ -69,7 +69,6 @@ public class GameProcess implements Runnable {
                 System.out.println("update model");
                 Model.setState(gameState.build());
                 Model.sendState(gameState.build());
-                //Model.showState(gameState.build());
             }
             else System.out.println("stops working");
         }
@@ -172,7 +171,6 @@ public class GameProcess implements Runnable {
         Model.setState(gameState.build());
     }
     private static int newZombieSnakeid(){
-        //TODO: sync
         List<SnakesProto.GameState.Snake> snakesList = gameState.getSnakesList();
         int id = -1;
         while (true) {
@@ -227,7 +225,6 @@ public class GameProcess implements Runnable {
     //finds snake + places it
     public static SnakesProto.GameState.Snake findPlace(int id){
         ConcurrentHashMap<SnakesProto.GameState.Coord, Integer> used_checks = new ConcurrentHashMap<>();
-        //TODO: sync iteration
         synchronized (gameState) {
             List<SnakesProto.GameState.Snake> snakesList = gameState.getSnakesList();
             Iterator<SnakesProto.GameState.Snake> iter = snakesList.iterator();
@@ -316,7 +313,6 @@ public class GameProcess implements Runnable {
         ConcurrentHashMap<SnakesProto.GameState.Coord, Integer> used_checks = new ConcurrentHashMap<>();
         List<Integer> food_eaters = new ArrayList<>();
         List<Integer> dead_players = new ArrayList<>();
-        //TODO: sync iteration
         synchronized (gameState) {
             List<SnakesProto.GameState.Snake> snakesList = gameState.getSnakesList();
             Iterator<SnakesProto.GameState.Snake> iter = snakesList.iterator();
@@ -543,7 +539,6 @@ public class GameProcess implements Runnable {
         }
     }
     public static void addPoint(Integer playerId) {
-        //TODO: sync iteration
         synchronized (gameState) {
             List<SnakesProto.GamePlayer> playerList = gameState.getPlayers().getPlayersList();
             for (int i = 0; i < playerList.size(); i++) {

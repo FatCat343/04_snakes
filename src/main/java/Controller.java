@@ -20,36 +20,28 @@ public class Controller {
     public static SnakesProto.NodeRole role = VIEWER;
     public static List<Sender> neededsenders = new ArrayList<>();
     public static void main(String[] args) {
-        //parse("config.txt");
         name = args[0];
         port = Integer.parseInt(args[1]);
-        //Model.Init(); // инициализирует необходимые структуры
 
         Model.Init();
-        //Model.StartNew(); //запускает одиночную игру
         NetworkReader.start();
         NetworkWriter.start();
     }
     public static void setState(SnakesProto.GameMessage gm, Sender sender){
         //changes state of ours snake
         Model.config = gm.getState().getState().getConfig();
-        //players = gm.getState().getState().getPlayers().getPlayersList();
         if (neededsenders.size() > 0) Controller.neededsenders.remove(0);
         if (Model.state != null && Model.state.getStateOrder() > gm.getState().getState().getStateOrder()) ;
         else Model.setState(gm.getState().getState(), sender);
         Model.sendAck(gm, getId(sender));
     }
 
-//    public static void parse(String filename){ //parse config file to get params
-//
-//    }
     public static void connect(Sender sender){
         exit();
         Model.state = null;
         if (Model.state == null) {
             System.out.println("setted state to null");
         }
-        //Model.setState(null);
         SnakesProto.GameMessage.Builder gm = SnakesProto.GameMessage.newBuilder();
         SnakesProto.GameMessage.JoinMsg.Builder join = SnakesProto.GameMessage.JoinMsg.newBuilder();
         join.setName(Controller.name);
@@ -88,7 +80,6 @@ public class Controller {
             Sender sender1 = neededsenders.get(0);
             if (sender.equals(sender1)){
                 System.out.println("got ack from neededsender");
-
                 Controller.masterSender = sender;
                 Controller.playerId = gm.getReceiverId();
                 SnakesProto.GamePlayer.Builder p = SnakesProto.GamePlayer.newBuilder();
@@ -98,7 +89,6 @@ public class Controller {
                 p.setPort(sender.port);
                 p.setRole(SnakesProto.NodeRole.MASTER);
                 p.setScore(0);
-
                 Model.getAck(gm, p.build());
             }
 
@@ -106,7 +96,6 @@ public class Controller {
     }
     public static void join(SnakesProto.GameMessage gm, Sender sender){
         Model.join(gm, sender);
-        //Model.sendAck(gm, getId(sender));
     }
     public static void roleChange(SnakesProto.GameMessage gm, Sender sender){
         if (gm.getRoleChange().hasSenderRole()){
@@ -125,7 +114,6 @@ public class Controller {
             if (gm.getRoleChange().getSenderRole().equals(MASTER)){
                 if (gm.getRoleChange().hasReceiverRole()){
                     if (gm.getRoleChange().getReceiverRole().equals(SnakesProto.NodeRole.DEPUTY)){
-                        //become deputy
                         System.out.println("become deputy");
                         Controller.role = SnakesProto.NodeRole.DEPUTY;
                     }
@@ -143,14 +131,12 @@ public class Controller {
         else {
             if (gm.getRoleChange().hasReceiverRole()){
                 if (gm.getRoleChange().getReceiverRole().equals(SnakesProto.NodeRole.DEPUTY)){
-                    //become deputy
                     Controller.role = SnakesProto.NodeRole.DEPUTY;
                 }
                 if (gm.getRoleChange().getReceiverRole().equals(SnakesProto.NodeRole.VIEWER)){
                     Model.becomeViewer(Controller.playerId);
                 }
             }
-
         }
         Model.sendAck(gm, getId(sender));
 
@@ -168,7 +154,6 @@ public class Controller {
         Model.StartNew();
     }
     public static SnakesProto.NodeRole getRole(int searchId){
-        //TODO: sync iteration
         Iterator<SnakesProto.GamePlayer> iter = Model.state.getPlayers().getPlayersList().iterator();
         while (iter.hasNext()) {
             SnakesProto.GamePlayer player = iter.next();
@@ -179,7 +164,6 @@ public class Controller {
         return null;
     }
     public static int getId(Sender sender){
-        //TODO: sync iteration
         Iterator<SnakesProto.GamePlayer> iter = Model.state.getPlayers().getPlayersList().iterator();
         while (iter.hasNext()) {
             SnakesProto.GamePlayer player = iter.next();
@@ -190,7 +174,6 @@ public class Controller {
         return -1;
     }
     public static SnakesProto.GamePlayer getPlayer(Sender sender){
-        //TODO: make synchronized iteration
         Iterator<SnakesProto.GamePlayer> iter = Model.state.getPlayers().getPlayersList().iterator();
         while (iter.hasNext()) {
             SnakesProto.GamePlayer player = iter.next();
@@ -201,7 +184,6 @@ public class Controller {
         return null;
     }
     public static SnakesProto.GamePlayer getPlayer(int searchId){
-        //TODO: make synchronized iteration
         Iterator<SnakesProto.GamePlayer> iter = Model.state.getPlayers().getPlayersList().iterator();
         while (iter.hasNext()) {
             SnakesProto.GamePlayer player = iter.next();
@@ -234,7 +216,6 @@ public class Controller {
         }
     }
     public static int findRole(SnakesProto.NodeRole role){
-        //int id = -1;
         Iterator<SnakesProto.GamePlayer> iter = Model.state.getPlayers().getPlayersList().iterator();
         while (iter.hasNext()) {
             SnakesProto.GamePlayer player = iter.next();
@@ -276,7 +257,6 @@ public class Controller {
         Model.continueGame();
         GameProcess.changeState(masterId, MASTER);
         findDeputy();
-        //send rolechange msg
         SnakesProto.GameMessage.RoleChangeMsg.Builder msg = SnakesProto.GameMessage.RoleChangeMsg.newBuilder();
         msg.setSenderRole(MASTER);
         Model.sendRoleChange(msg.build(), -1);
