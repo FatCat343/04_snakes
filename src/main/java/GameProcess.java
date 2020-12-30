@@ -182,7 +182,8 @@ public class GameProcess implements Runnable {
         synchronized (gameState) {
             //gameState.getPlayers().getPlayersList().remove(playerId);
             SnakesProto.GamePlayers.Builder players = SnakesProto.GamePlayers.newBuilder(gameState.getPlayers());
-            players.removePlayers(playerId);
+            int playerInd = Controller.findIdIndex(playerId);
+            players.removePlayers(playerInd);
             gameState.setPlayers(players);
         }
         Model.setState(gameState.build());

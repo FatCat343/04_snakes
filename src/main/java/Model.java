@@ -189,12 +189,13 @@ public class Model {
             SnakesProto.GameState.Builder newstate = SnakesProto.GameState.newBuilder(state1);
             SnakesProto.GamePlayers.Builder players = SnakesProto.GamePlayers.newBuilder(state.getPlayers());
             int masterId = Controller.findRole(MASTER);
+            int masterIndex = Controller.findRoleIndex(MASTER);
             Controller.masterId = masterId;
             Controller.role = Controller.getRole(Controller.playerId);
-            SnakesProto.GamePlayer.Builder master = SnakesProto.GamePlayer.newBuilder(players.getPlayers(masterId));
+            SnakesProto.GamePlayer.Builder master = SnakesProto.GamePlayer.newBuilder(players.getPlayers(masterIndex));
             master.setIpAddress(sender.ip);
             master.setPort(sender.port);
-            players.setPlayers(masterId, master.build());
+            players.setPlayers(masterIndex, master.build());
             System.out.println("new master player = " + master.build());
             newstate.setPlayers(players.build());
             state = newstate.build();
@@ -313,15 +314,16 @@ public class Model {
         }
     }
     public static void getAck(SnakesProto.GameMessage gm, SnakesProto.GamePlayer player){
-        //TODO: make iteration synchronized - V
         synchronized (NetworkWriter.resend) {
             Iterator<MessageCustom> iter = NetworkWriter.resend.iterator();
             while (iter.hasNext()) {
                 MessageCustom messageCustom = iter.next();
                 if (messageCustom.gm.getMsgSeq() == gm.getMsgSeq()) {
                     //if ack on join - set playerId
-                    Controller.playerId = gm.getReceiverId();
-                    Controller.masterId = gm.getSenderId(); //??
+                    if (gm.getTypeCase().equals(SnakesProto.GameMessage.TypeCase.JOIN)) {
+                        Controller.playerId = gm.getReceiverId();
+                        Controller.masterId = gm.getSenderId();
+                    }
                     //delete sender id from branches
                     messageCustom.branches.remove(player);
                 }

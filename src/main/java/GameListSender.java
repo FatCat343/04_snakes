@@ -23,7 +23,7 @@ public class GameListSender implements Runnable {
             byte[] sendBuf = msg.toByteArray();
             DatagramPacket packet = new DatagramPacket(sendBuf, sendBuf.length, group, port);
             //System.out.println("sends " + type + " with id = " + id + " to addr = " + cld.addr + " to port = " + cld.port);
-            System.out.println("sends UDP");
+            //System.out.println("sends UDP");
             socket.send(packet);
 
         }

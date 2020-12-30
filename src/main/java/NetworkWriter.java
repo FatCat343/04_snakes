@@ -99,7 +99,9 @@ public class NetworkWriter implements Runnable {
                                     if (Model.state.getPlayers().getPlayersList().contains(player)) {
                                         //if needed to be sent to MASTER, finds new MASTER
                                         if (player.getRole().equals(SnakesProto.NodeRole.MASTER)) {
+                                            //int masterIndex = Controller.findRoleIndex(MASTER);
                                             SnakesProto.GamePlayer master = Controller.getPlayer(Controller.masterId);
+                                            System.out.println("sends to new master " + master);
                                             if (master != null && Controller.role != MASTER) Network.send(msg.gm, master);
                                         } else Network.send(msg.gm, player);
                                     } else iter.remove();
@@ -260,10 +262,10 @@ public class NetworkWriter implements Runnable {
                 if (player == null) continue;
                 //Model.state.getPlayers().getPlayersList().remove(player);
                 //we are normal, delete master
-                Model.disconnect(player.getId());
+
                 if ((player.getRole().equals(SnakesProto.NodeRole.MASTER)) && (Objects.equals(Controller.getRole(Controller.playerId), SnakesProto.NodeRole.NORMAL))) {
                     Controller.changeMaster();
-                    continue;
+                    //continue;
                 }
                 //we are deputy, delete master
                 if ((player.getRole().equals(SnakesProto.NodeRole.MASTER)) && (Objects.equals(Controller.getRole(Controller.playerId), SnakesProto.NodeRole.DEPUTY))) {
@@ -277,14 +279,14 @@ public class NetworkWriter implements Runnable {
 //                    SnakesProto.GameMessage.RoleChangeMsg.Builder msg = SnakesProto.GameMessage.RoleChangeMsg.newBuilder();
 //                    msg.setSenderRole(MASTER);
 //                    Model.sendRoleChange(msg.build(), -1);
-                    continue;
+                    //continue;
                 }
                 //we are master, delete deputy
                 if ((player.getRole().equals(SnakesProto.NodeRole.DEPUTY)) && (Objects.equals(Controller.getRole(Controller.playerId), SnakesProto.NodeRole.MASTER))) {
                     Controller.findDeputy();
                     //continue;
                 }
-
+                Model.disconnect(player.getId());
             }
         }
     }

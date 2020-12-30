@@ -33,7 +33,6 @@ public class Controller {
     public static void setState(SnakesProto.GameMessage gm, Sender sender){
         //changes state of ours snake
         Model.config = gm.getState().getState().getConfig();
-        //TODO: make change synchronized
         //players = gm.getState().getState().getPlayers().getPlayersList();
         if (neededsenders.size() > 0) Controller.neededsenders.remove(0);
         if (Model.state != null && Model.state.getStateOrder() > gm.getState().getState().getStateOrder()) ;
@@ -242,6 +241,30 @@ public class Controller {
             if (player.getRole().equals(role)) {
                 return player.getId();
             }
+        }
+        return -1;
+    }
+    public static int findRoleIndex(SnakesProto.NodeRole role){
+        int ind = 0;
+        Iterator<SnakesProto.GamePlayer> iter = Model.state.getPlayers().getPlayersList().iterator();
+        while (iter.hasNext()) {
+            SnakesProto.GamePlayer player = iter.next();
+            if (player.getRole().equals(role)) {
+                return ind;
+            }
+            ind++;
+        }
+        return -1;
+    }
+    public static int findIdIndex(int id){
+        int ind = 0;
+        Iterator<SnakesProto.GamePlayer> iter = Model.state.getPlayers().getPlayersList().iterator();
+        while (iter.hasNext()) {
+            SnakesProto.GamePlayer player = iter.next();
+            if (player.getId() == id) {
+                return ind;
+            }
+            ind++;
         }
         return -1;
     }
