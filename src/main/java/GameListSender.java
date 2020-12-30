@@ -22,10 +22,7 @@ public class GameListSender implements Runnable {
             InetAddress group = InetAddress.getByName(ipAddress);
             byte[] sendBuf = msg.toByteArray();
             DatagramPacket packet = new DatagramPacket(sendBuf, sendBuf.length, group, port);
-            //System.out.println("sends " + type + " with id = " + id + " to addr = " + cld.addr + " to port = " + cld.port);
-            //System.out.println("sends UDP");
             socket.send(packet);
-
         }
         catch (IOException e) {
             e.printStackTrace();
@@ -35,7 +32,6 @@ public class GameListSender implements Runnable {
     public void run() {
         try {
             socket = GameListReceiver.socket;
-            //GameListReceiver.StartClient(socket);
             SnakesProto.GameMessage.Builder msg = SnakesProto.GameMessage.newBuilder();
             SnakesProto.GameMessage.AnnouncementMsg.Builder ann = SnakesProto.GameMessage.AnnouncementMsg.newBuilder();
             ann.setConfig(Model.config);

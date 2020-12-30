@@ -8,8 +8,6 @@ public class NetworkReader implements Runnable{
 //listens on all messages except multicast
     public static ConcurrentHashMap<Sender, SnakesProto.GameMessage> received = new ConcurrentHashMap<>();
 
-
-
     public static void start(){
         Thread t = new Thread(new NetworkReader());
         t.start();
@@ -24,9 +22,7 @@ public class NetworkReader implements Runnable{
                 System.out.println("received null message");
                 continue;
             }
-            //System.out.println("sender ip = " + sender.ip);
             int alreadyReceived = 0;
-            //TODO: make iteration synchronised
             synchronized (received) {
                 for (Map.Entry<Sender, SnakesProto.GameMessage> pair : received.entrySet()) {
                     SnakesProto.GameMessage message = pair.getValue();
@@ -61,7 +57,6 @@ public class NetworkReader implements Runnable{
             }
 
             //check whether we have msg of same type from same sender
-            //TODO: make iteration synchronised
             synchronized (received) {
                 received.entrySet().removeIf(pair ->
                         ((pair.getKey().equals(sender)) && (pair.getValue().getTypeCase().equals(gm.getTypeCase()))));
@@ -70,7 +65,6 @@ public class NetworkReader implements Runnable{
             received.put(sender, gm);
             switch (gm.getTypeCase()) {
                 case PING:{
-                    //System.out.println("received ping");
                     Controller.pingAnswer(gm, sender);
                     break;
                 }
@@ -80,7 +74,6 @@ public class NetworkReader implements Runnable{
                     break;
                 }
                 case ACK:{
-                    //System.out.println("received ack");
                     Controller.ack(gm, sender);
                     break;
                 }

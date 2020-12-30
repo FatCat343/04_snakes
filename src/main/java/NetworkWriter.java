@@ -8,13 +8,6 @@ import static java.time.temporal.ChronoUnit.SECONDS;
 import static me.ippolitov.fit.snakes.SnakesProto.NodeRole.MASTER;
 
 public class NetworkWriter implements Runnable {
-    //waits on message queue or invokes to resend message
-    //message -> if message send to all others except host (first check that it is not in the list) -> add to list with send time && origtime = sendtime
-    //if reply -> send to destination host
-    //compare time.now with InvokeTime -> sleep for diff millisec
-    //invokes by time -> removes list[0] -> send list[0] && invoke time = 0 -> ads list[0] to the end of list with new send time
-    //invoketime = =0 -> invoketime = list[0].time + 3000ms
-    //private static ConcurrentLinkedQueue<MStruct> queue;
     public static LinkedBlockingDeque<MessageCustom> resend = new LinkedBlockingDeque<>();
     public static BlockingQueue<SnakesProto.GameMessage> queue = new LinkedBlockingQueue<>() ; //queue on output
     public static ConcurrentHashMap<SnakesProto.GamePlayer, LocalTime> lastSent = new ConcurrentHashMap<>();
@@ -28,10 +21,8 @@ public class NetworkWriter implements Runnable {
         while (true) {
             SnakesProto.GameMessage message;
             try {
-                //System.out.println("waiting on new messages to send");
                 message = queue.poll(Model.config.getPingDelayMs(), TimeUnit.MILLISECONDS);
                 if (message != null) {
-                    //System.out.println("polled message of type " + message.getTypeCase());
                     switch (message.getTypeCase()) {
                         case PING:
                         case ERROR:
@@ -99,7 +90,6 @@ public class NetworkWriter implements Runnable {
                                     if (Model.state.getPlayers().getPlayersList().contains(player)) {
                                         //if needed to be sent to MASTER, finds new MASTER
                                         if (player.getRole().equals(SnakesProto.NodeRole.MASTER)) {
-                                            //int masterIndex = Controller.findRoleIndex(MASTER);
                                             SnakesProto.GamePlayer master = Controller.getPlayer(Controller.masterId);
                                             System.out.println("sends to new master " + master);
                                             if (master != null && Controller.role != MASTER) Network.send(msg.gm, master);
@@ -145,7 +135,6 @@ public class NetworkWriter implements Runnable {
         send_single(gm.build());
     }
     public static void sendError(SnakesProto.GameMessage message, SnakesProto.GamePlayer receiver){
-        //System.out.println("sends error to " + receiver.getIpAddress()+":"+receiver.getPort());
         MessageCustom mst = new MessageCustom();
         mst.gm = message;
         mst.branches = new ArrayList<>();
@@ -164,7 +153,6 @@ public class NetworkWriter implements Runnable {
             }
         }
         boolean res = resend.add(mst);
-        //System.out.println("result of offering = " + res + " tryed to offer " + message.packet.id.toString());
         if (invoketime == null) {
             invoketime = mst.origtime.plusNanos(Model.config.getPingDelayMs() * 1000000);
         }
@@ -174,12 +162,10 @@ public class NetworkWriter implements Runnable {
         t.start();
     }
     private void send_all(SnakesProto.GameMessage message){
-        //System.out.println("sends message to all");
         MessageCustom mst = new MessageCustom();
         mst.gm = message;
         mst.branches = new ArrayList<>(Model.state.getPlayers().getPlayersList());
         //our gameplayer, not resend to ourself
-        //System.out.println("our playerid = " + Controller.playerId);
         mst.branches.removeIf(pl -> pl.getId() == Controller.playerId);
 
         mst.origtime = LocalTime.now();
@@ -203,7 +189,6 @@ public class NetworkWriter implements Runnable {
         }
     }
     private void send_single(SnakesProto.GameMessage message){
-       // System.out.println("send msg to single receiver, id = " + message.getReceiverId());
         MessageCustom mst = new MessageCustom();
         mst.gm = message;
         mst.branches = new ArrayList<>();
@@ -225,13 +210,11 @@ public class NetworkWriter implements Runnable {
             }
         }
         boolean res = resend.add(mst);
-        //System.out.println("result of offering = " + res + " tryed to offer " + message.packet.id.toString());
         if (invoketime == null) {
             invoketime = mst.origtime.plusNanos(Model.config.getPingDelayMs() * 1000000);
         }
     }
     private static void send_ack(SnakesProto.GameMessage gm){
-       // System.out.println("send ack to id = " + gm.getReceiverId());
         //same as send_single, but don't add to resend
         SnakesProto.GamePlayer player = Controller.getPlayer(gm.getReceiverId());
         if ((player == null)) {
@@ -256,35 +239,20 @@ public class NetworkWriter implements Runnable {
         if (Model.state != null) {
             Iterator<SnakesProto.GamePlayer> it = clients.iterator();
             while (it.hasNext()) {
-                //works with up-to-date player
                 SnakesProto.GamePlayer pl = it.next();
                 SnakesProto.GamePlayer player = Controller.getPlayer(pl.getId());
                 if (player == null) continue;
-                //Model.state.getPlayers().getPlayersList().remove(player);
                 //we are normal, delete master
-
                 if ((player.getRole().equals(SnakesProto.NodeRole.MASTER)) && (Objects.equals(Controller.getRole(Controller.playerId), SnakesProto.NodeRole.NORMAL))) {
                     Controller.changeMaster();
-                    //continue;
                 }
                 //we are deputy, delete master
                 if ((player.getRole().equals(SnakesProto.NodeRole.MASTER)) && (Objects.equals(Controller.getRole(Controller.playerId), SnakesProto.NodeRole.DEPUTY))) {
-                    //Controller.role = SnakesProto.NodeRole.MASTER;
                     Controller.becomeMaster();
-                    //Model.disconnect(player.getId());
-//                    Model.continueGame();
-//                    Model.disconnect(player.getId());
-//                    Controller.findDeputy();
-//                    //send rolechange msg
-//                    SnakesProto.GameMessage.RoleChangeMsg.Builder msg = SnakesProto.GameMessage.RoleChangeMsg.newBuilder();
-//                    msg.setSenderRole(MASTER);
-//                    Model.sendRoleChange(msg.build(), -1);
-                    //continue;
                 }
                 //we are master, delete deputy
                 if ((player.getRole().equals(SnakesProto.NodeRole.DEPUTY)) && (Objects.equals(Controller.getRole(Controller.playerId), SnakesProto.NodeRole.MASTER))) {
                     Controller.findDeputy();
-                    //continue;
                 }
                 Model.disconnect(player.getId());
             }

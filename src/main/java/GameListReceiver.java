@@ -24,46 +24,32 @@ public class GameListReceiver implements Runnable {
     }
     GameListReceiver(){}
     public void UpdateTable(SnakesProto.GameMessage.AnnouncementMsg msg, Sender sender){
-        //String senderstring = sender.ip + " " + sender.port;
         if (clients.containsKey(sender)) {
-            //System.out.println("replace, amount = " + clients.size());
             clients.replace(sender, LocalTime.now());
             table.replace(sender, msg);
         }
         else {
-            //System.out.println("put, amount = " + clients.size());
             clients.put(sender, LocalTime.now());
             table.put(sender, msg);
         }
         Iterator<Map.Entry<Sender, LocalTime>> it = clients.entrySet().iterator();
         while(it.hasNext()){
-            //System.out.println("1");
             Map.Entry<Sender, LocalTime> pair = it.next();
-            //System.out.println(pair.getKey());
             if (pair.getValue().plusSeconds(2).isBefore(LocalTime.now())) { //timeout
-                //System.out.println(pair.getKey() + "  " + pair.getValue() + "   " + LocalTime.now());
                 Sender key = pair.getKey();
-
-                //System.out.println("remove " + key.port + "  " + key.ip);
                 table.remove(key);
                 it.remove();
             }
         }
     }
     public void receiveUDPMessage(String ip, int port) throws IOException {
-        //byte[] buffer = new byte[1024];
         InetAddress group = InetAddress.getByName(ip);
         socket.joinGroup(group);
         while (true) {
             Sender sender = new Sender();
             byte[] recvBuf = new byte[64000];
             DatagramPacket packet = new DatagramPacket(recvBuf, recvBuf.length);
-
             socket.receive(packet);
-
-            //System.out.println("received from ip = " + sender.ip + " port = ");
-
-            //sender.port = packet.getPort();
             SnakesProto.GameMessage msg = SnakesProto.GameMessage.parseFrom(Arrays.copyOf(packet.getData(), packet.getLength()));
             List<SnakesProto.GamePlayer> players = msg.getAnnouncement().getPlayers().getPlayersList();
             Iterator<SnakesProto.GamePlayer> iter = players.iterator();
@@ -75,8 +61,6 @@ public class GameListReceiver implements Runnable {
             if (j < msg.getAnnouncement().getPlayers().getPlayersList().size()) {
                 sender.ip = packet.getAddress().toString().split("/")[1];
                 sender.port = msg.getAnnouncement().getPlayers().getPlayers(j).getPort();
-                //System.out.println("received packet from ip = " + sender.ip + "  port = " + sender.port);
-
                 UpdateTable(msg.getAnnouncement(), sender);
             }
         }

@@ -21,8 +21,6 @@ public class Model {
     public int[] field;
     public int food;
     public static DatagramSocket socket;
-    //public static GameProcess game;
-    //public static ConcurrentHashMap<String, State> states = new ConcurrentHashMap<String, State>();
     public static SnakesProto.GameState state;
     public static SnakesProto.GameConfig config;
     public static int msgNum = 0;
@@ -31,10 +29,7 @@ public class Model {
             socket = new DatagramSocket(Controller.port);
             parse("conf.txt");
             GameListReceiver.start();
-            ///
             GUI.init(config); //set params in init
-            //new GameProcess();
-            //System.out.println(game.running);
             GameProcess.start();
         } catch (SocketException e) {
             e.printStackTrace();
@@ -43,33 +38,22 @@ public class Model {
     public static void continueGame(){
         GameListSender.running = true;
         GameProcess.continueGame(state);
-
     }
-
-
 
     public static void StartNew() {
         if (GameProcess.finished = true) {
             exit();
             new GameProcess();
-            //GameProcess.restart();
             GameListSender.running = true;
             GameProcess.restart();
             Controller.playerId = 0;
             Controller.masterId = 0;
             Controller.role = MASTER;
         }
-        //adding is in start
-        //GameProcess.newPlayer(null, null);
-
-
-        //GUI.repaint(state, GameListReceiver.table);
     }
-
 
     public static void parse(String filename){ //parse config file to get params
         SnakesProto.GameConfig.Builder tmp = SnakesProto.GameConfig.newBuilder();
-
         BufferedReader reader;
         try {
             reader = new BufferedReader(new FileReader(filename));
@@ -109,12 +93,9 @@ public class Model {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
         config = tmp.build();
     }
-//    public static void placeSnake(SnakesProto.GameState.Snake s){
-//
-//    }
+
     public static void exit() {
         //send changeState to viewer
         if (Controller.role == MASTER){
@@ -122,21 +103,6 @@ public class Model {
             GameProcess.running = false;
             GameListSender.running = false;
             GameProcess.stop();
-            //GameProcess.changeState(Controller.playerId, VIEWER);
-
-//            if (Controller.findRole(DEPUTY) < 0){
-//                Controller.findDeputy();
-//            }
-//            int dest = Controller.findRole(DEPUTY);
-//            if (dest < 0){
-//                //no players left
-//            }
-//            else {
-//                SnakesProto.GameMessage.RoleChangeMsg.Builder msg = SnakesProto.GameMessage.RoleChangeMsg.newBuilder();
-//                msg.setSenderRole(VIEWER);
-//                msg.setReceiverRole(MASTER);
-//                Model.sendRoleChange(msg.build(), Controller.masterId);
-//            }
         }
         else {
             //exit as player --> send VIEWER rolechange
@@ -154,15 +120,9 @@ public class Model {
     }
     public static void join(SnakesProto.GameMessage gm, Sender sender){
         GameProcess.newPlayer(gm, sender);
-
     }
-//    public static void deleteSnake(int id){
-//        //player needs become viewer
-//
-//        //GameProcess.aliveSnakes--;
-//    }
+
     public static void error(SnakesProto.GameMessage gm, SnakesProto.GamePlayer player){
-        //exit();
         GUI.error(gm.getError().getErrorMessage());
         synchronized (NetworkWriter.resend) {
             Iterator<MessageCustom> iter = NetworkWriter.resend.iterator();
@@ -170,7 +130,7 @@ public class Model {
                 if (iter.next().gm.getMsgSeq() == gm.getMsgSeq()) {
                     //if ack on join - set playerId
                     Controller.playerId = gm.getReceiverId();
-                    Controller.masterId = gm.getSenderId(); //??
+                    Controller.masterId = gm.getSenderId();
                     //delete sender id from branches
                     iter.next().branches.remove(player);
                 }
@@ -179,27 +139,24 @@ public class Model {
     }
     public static void setState(SnakesProto.GameState state1){
         state = state1;
-        //update controller.players
         GUI.repaint(state, GameListReceiver.table);
     }
 
     public static void setState(SnakesProto.GameState state1, Sender sender){
-        //synchronized (state) {
-            state = state1;
-            SnakesProto.GameState.Builder newstate = SnakesProto.GameState.newBuilder(state1);
-            SnakesProto.GamePlayers.Builder players = SnakesProto.GamePlayers.newBuilder(state.getPlayers());
-            int masterId = Controller.findRole(MASTER);
-            int masterIndex = Controller.findRoleIndex(MASTER);
-            Controller.masterId = masterId;
-            Controller.role = Controller.getRole(Controller.playerId);
-            SnakesProto.GamePlayer.Builder master = SnakesProto.GamePlayer.newBuilder(players.getPlayers(masterIndex));
-            master.setIpAddress(sender.ip);
-            master.setPort(sender.port);
-            players.setPlayers(masterIndex, master.build());
-            System.out.println("new master player = " + master.build());
-            newstate.setPlayers(players.build());
-            state = newstate.build();
-       // }
+        state = state1;
+        SnakesProto.GameState.Builder newstate = SnakesProto.GameState.newBuilder(state1);
+        SnakesProto.GamePlayers.Builder players = SnakesProto.GamePlayers.newBuilder(state.getPlayers());
+        int masterId = Controller.findRole(MASTER);
+        int masterIndex = Controller.findRoleIndex(MASTER);
+        Controller.masterId = masterId;
+        Controller.role = Controller.getRole(Controller.playerId);
+        SnakesProto.GamePlayer.Builder master = SnakesProto.GamePlayer.newBuilder(players.getPlayers(masterIndex));
+        master.setIpAddress(sender.ip);
+        master.setPort(sender.port);
+        players.setPlayers(masterIndex, master.build());
+        System.out.println("new master player = " + master.build());
+        newstate.setPlayers(players.build());
+        state = newstate.build();
         //update controller.players
         GUI.repaint(state, GameListReceiver.table);
     }
@@ -271,7 +228,6 @@ public class Model {
     }
     public static void sendAck(SnakesProto.GameMessage message, int receiverId){
         if (Controller.neededsenders.size() == 0) {
-            //System.out.println("sendAck called");
             SnakesProto.GameMessage.Builder gm = SnakesProto.GameMessage.newBuilder();
             SnakesProto.GameMessage.AckMsg.Builder ack = SnakesProto.GameMessage.AckMsg.newBuilder();
             gm.setAck(ack.build());
@@ -280,7 +236,6 @@ public class Model {
             NetworkWriter.queue.add(gm.build());
         }
         else {
-            //System.out.println("sendack called");
             SnakesProto.GameMessage.Builder gm = SnakesProto.GameMessage.newBuilder();
             SnakesProto.GameMessage.AckMsg.Builder ack = SnakesProto.GameMessage.AckMsg.newBuilder();
             gm.setAck(ack.build());
@@ -341,28 +296,15 @@ public class Model {
             msg.setSenderRole(MASTER);
             sendRoleChange(msg.build(), id);
         }
-        else {
-            //we become viewer
-            //Controller.role = SnakesProto.NodeRole.VIEWER;
-            //GameProcess.changeState(id, VIEWER);
-            //GameProcess.makeZombie(id);
-        }
-        //GameProcess.aliveSnakes--;
-
+        else {}
     }
     public static void becomeViewer(int playerId){
-        //?
         Controller.role = VIEWER;
     }
-//    public static void dead(){
-//
-//    }
+
     public static void disconnect(int id) {
         if (Controller.role.equals(MASTER)) {
-            //find snake, set to !ALIVE, set new playerid (<0)
             if (Controller.getPlayer(id).getRole() != VIEWER) GameProcess.makeZombie(id);
-            //delete from players
-            //GameProcess.deletePlayer(id);
             GameProcess.deletePlayer(id);
         }
         else {
