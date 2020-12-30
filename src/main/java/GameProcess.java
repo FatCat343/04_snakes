@@ -16,10 +16,11 @@ public class GameProcess implements Runnable {
     public static Thread t;
     public static boolean running;
     public static boolean finished;
-    private static int stateOrder = 0;
+    private static int stateOrder;
     GameProcess(){
         running = true;
         finished = false;
+        stateOrder = 0;
         gameState = SnakesProto.GameState.newBuilder();
         steers = new ConcurrentHashMap<>();
         gameState.setConfig(Model.config);
@@ -86,6 +87,7 @@ public class GameProcess implements Runnable {
     }
     public static void continueGame(SnakesProto.GameState state){
         gameState = SnakesProto.GameState.newBuilder(state);
+        stateOrder = state.getStateOrder();
         int count = 0;
         List<SnakesProto.GamePlayer> playerList = state.getPlayers().getPlayersList();
         for (int i = 0; i < playerList.size(); i++) {
